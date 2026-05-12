@@ -1,17 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import '../models/auction_item.dart';
 import '../theme/app_theme.dart';
 import '../widgets/countdown_timer.dart';
+import '../widgets/deposit_bottom_sheet.dart';
 import '../widgets/pressable.dart';
 
 class BidBottomSheet extends StatefulWidget {
   final AuctionItem item;
+  final bool isSignedIn;
+  final double previousBidAmount;
   final Function(double) onPlaceBid;
 
   const BidBottomSheet({
     super.key,
     required this.item,
+    required this.isSignedIn,
+    this.previousBidAmount = 0,
     required this.onPlaceBid,
   });
 
@@ -32,7 +38,7 @@ class _BidBottomSheetState extends State<BidBottomSheet> {
     _maxBid = widget.item.currentBid * 2;
     _currentValue = _minBid;
     _bidController = TextEditingController(
-      text: _currentValue.toStringAsFixed(0),
+      text: NumberFormat('#,##0').format(_currentValue.round()),
     );
   }
 
@@ -43,15 +49,13 @@ class _BidBottomSheetState extends State<BidBottomSheet> {
   }
 
   String _formatMoney(double v) {
-    if (v >= 1000000) return '\$${(v / 1000000).toStringAsFixed(2)}M';
-    if (v >= 1000) return '\$${(v / 1000).toStringAsFixed(1)}K';
-    return '\$${v.toStringAsFixed(0)}';
+    return 'UGX ${NumberFormat('#,##0').format(v.round())}';
   }
 
   void _setBid(double v) {
     setState(() {
       _currentValue = v.clamp(_minBid, _maxBid);
-      _bidController.text = _currentValue.toStringAsFixed(0);
+      _bidController.text = NumberFormat('#,##0').format(_currentValue.round());
     });
     HapticFeedback.selectionClick();
   }
@@ -62,11 +66,24 @@ class _BidBottomSheetState extends State<BidBottomSheet> {
 
   void _placeBid() {
     final bidAmount =
-        double.tryParse(_bidController.text) ?? _currentValue;
+        double.tryParse(_bidController.text.replaceAll(',', '')) ??
+        _currentValue;
     if (bidAmount > widget.item.currentBid) {
-      HapticFeedback.mediumImpact();
-      widget.onPlaceBid(bidAmount);
+      HapticFeedback.lightImpact();
+      // Pop the bid sheet first, then show the deposit sheet above it.
       Navigator.pop(context);
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        barrierColor: Colors.black.withOpacity(0.5),
+        builder: (_) => DepositBottomSheet(
+          bidAmount: bidAmount,
+          previousBidAmount: widget.previousBidAmount,
+          isSignedIn: widget.isSignedIn,
+          onConfirm: () => widget.onPlaceBid(bidAmount),
+        ),
+      );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -117,10 +134,7 @@ class _BidBottomSheetState extends State<BidBottomSheet> {
                     ),
                   ),
                   const SizedBox(height: 22),
-                  Text(
-                    'Place your bid',
-                    style: theme.textTheme.displaySmall,
-                  ),
+                  Text('Place your bid', style: theme.textTheme.displaySmall),
                   const SizedBox(height: 4),
                   Text(
                     widget.item.title,
@@ -132,10 +146,8 @@ class _BidBottomSheetState extends State<BidBottomSheet> {
                   Container(
                     padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
-                      color:
-                          theme.colorScheme.surfaceContainerHighest.withOpacity(
-                        0.6,
-                      ),
+                      color: theme.colorScheme.surfaceContainerHighest
+                          .withOpacity(0.6),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(
@@ -175,8 +187,7 @@ class _BidBottomSheetState extends State<BidBottomSheet> {
                                 CountdownTimer(
                                   endTime: widget.item.endTime,
                                   compact: true,
-                                  textStyle:
-                                      theme.textTheme.titleLarge,
+                                  textStyle: theme.textTheme.titleLarge,
                                 ),
                               ],
                             ),
@@ -212,11 +223,11 @@ class _BidBottomSheetState extends State<BidBottomSheet> {
                         const Padding(
                           padding: EdgeInsets.only(bottom: 6),
                           child: Text(
-                            '\$',
+                            'UGX',
                             style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w800,
-                              fontSize: 28,
+                              fontSize: 18,
                             ),
                           ),
                         ),
@@ -247,8 +258,7 @@ class _BidBottomSheetState extends State<BidBottomSheet> {
                               final value = double.tryParse(v);
                               if (value != null) {
                                 setState(() {
-                                  _currentValue =
-                                      value.clamp(_minBid, _maxBid);
+                                  _currentValue = value.clamp(_minBid, _maxBid);
                                 });
                               }
                             },
@@ -311,17 +321,17 @@ class _BidBottomSheetState extends State<BidBottomSheet> {
                   Row(
                     children: [
                       _QuickBidButton(
-                        label: '+\$1K',
+                        label: '+1K',
                         onPressed: () => _bump(1000),
                       ),
                       const SizedBox(width: 10),
                       _QuickBidButton(
-                        label: '+\$5K',
+                        label: '+5K',
                         onPressed: () => _bump(5000),
                       ),
                       const SizedBox(width: 10),
                       _QuickBidButton(
-                        label: '+\$10K',
+                        label: '+10K',
                         onPressed: () => _bump(10000),
                       ),
                     ],

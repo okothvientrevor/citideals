@@ -18,31 +18,33 @@ class CountdownTimer extends StatefulWidget {
 }
 
 class _CountdownTimerState extends State<CountdownTimer> {
-  late Timer _timer;
+  Timer? _timer;
   Duration _remaining = Duration.zero;
 
   @override
   void initState() {
     super.initState();
-    _updateRemaining();
-    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
+    _remaining = _calcRemaining();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       _updateRemaining();
     });
   }
 
+  Duration _calcRemaining() {
+    final remaining = widget.endTime.difference(DateTime.now());
+    return remaining.isNegative ? Duration.zero : remaining;
+  }
+
   void _updateRemaining() {
-    setState(() {
-      _remaining = widget.endTime.difference(DateTime.now());
-      if (_remaining.isNegative) {
-        _remaining = Duration.zero;
-        _timer.cancel();
-      }
-    });
+    final remaining = _calcRemaining();
+    if (remaining == Duration.zero) _timer?.cancel();
+    if (!mounted) return;
+    setState(() => _remaining = remaining);
   }
 
   @override
   void dispose() {
-    _timer.cancel();
+    _timer?.cancel();
     super.dispose();
   }
 

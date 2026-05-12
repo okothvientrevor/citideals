@@ -1,19 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../features/submission/submit_listing_screen.dart';
+import '../services/auctions_repository.dart';
 import '../widgets/auction_card.dart';
 import '../widgets/pressable.dart';
-import '../data/mock_data.dart';
 import '../theme/app_theme.dart';
 import '../models/auction_item.dart';
 import 'auction_detail_screen.dart';
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _selectedCategory = 0;
   final List<_Category> _categories = const [
     _Category('All', Icons.apps_rounded),
@@ -26,10 +28,22 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final trendingItems = MockData.getTrendingItems();
-    final featuredItems = MockData.getFeaturedItems();
+    final trendingAsync = ref.watch(trendingAuctionsStreamProvider);
+    final liveAsync = ref.watch(liveAuctionsStreamProvider);
+
+    final trendingItems = trendingAsync.value ?? const <AuctionItem>[];
+    final selectedCat = _categories[_selectedCategory].label;
+    final featuredItems = (liveAsync.value ?? const <AuctionItem>[])
+        .where((it) => selectedCat == 'All' || it.category == selectedCat)
+        .toList();
 
     return Scaffold(
+      floatingActionButton: _SubmitFab(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const SubmitListingScreen()),
+        ),
+      ),
       body: RefreshIndicator(
         color: AppTheme.primary,
         onRefresh: () async {
@@ -68,7 +82,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         width: 280,
                         child: AuctionCard(
                           item: trendingItems[index],
-                          onTap: () => _openDetail(trendingItems[index]),
+                          heroTag:
+                              'auction_image_trending_${trendingItems[index].id}',
+                          onTap: () =>
+                              _openDetail(trendingItems[index], 'trending'),
                         ),
                       ),
                     );
@@ -85,17 +102,18 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             const SliverToBoxAdapter(child: SizedBox(height: 12)),
-            SliverToBoxAdapter(child: _CategoryChips(
-              categories: _categories,
-              selected: _selectedCategory,
-              onChange: (i) => setState(() => _selectedCategory = i),
-            )),
+            SliverToBoxAdapter(
+              child: _CategoryChips(
+                categories: _categories,
+                selected: _selectedCategory,
+                onChange: (i) => setState(() => _selectedCategory = i),
+              ),
+            ),
             const SliverToBoxAdapter(child: SizedBox(height: 16)),
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               sliver: SliverGrid(
-                gridDelegate:
-                    const SliverGridDelegateWithFixedCrossAxisCount(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
                   childAspectRatio: 0.62,
                   crossAxisSpacing: 14,
@@ -107,7 +125,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: AuctionCard(
                       item: featuredItems[index],
                       compact: true,
-                      onTap: () => _openDetail(featuredItems[index]),
+                      heroTag:
+                          'auction_image_discover_${featuredItems[index].id}',
+                      onTap: () =>
+                          _openDetail(featuredItems[index], 'discover'),
                     ),
                   );
                 }, childCount: featuredItems.length),
@@ -120,17 +141,17 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _openDetail(AuctionItem item) {
+  void _openDetail(AuctionItem item, [String section = 'default']) {
     Navigator.push(
       context,
       PageRouteBuilder(
         transitionDuration: const Duration(milliseconds: 350),
-        pageBuilder: (_, __, ___) => AuctionDetailScreen(item: item),
+        pageBuilder: (_, __, ___) => AuctionDetailScreen(
+          item: item,
+          heroTag: 'auction_image_${section}_${item.id}',
+        ),
         transitionsBuilder: (_, anim, __, child) {
-          return FadeTransition(
-            opacity: anim,
-            child: child,
-          );
+          return FadeTransition(opacity: anim, child: child);
         },
       ),
     );
@@ -167,9 +188,7 @@ class _Header extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   'Find your next gem',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontSize: 18,
-                  ),
+                  style: theme.textTheme.titleLarge?.copyWith(fontSize: 18),
                 ),
               ],
             ),
@@ -333,10 +352,7 @@ class _SectionHeader extends StatelessWidget {
           Pressable(
             onTap: onSeeAll,
             child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 8,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
                 color: AppTheme.primary.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(14),
@@ -430,6 +446,50 @@ class _CategoryChips extends StatelessWidget {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _SubmitFab extends StatelessWidget {
+  final VoidCallback onTap;
+  const _SubmitFab({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 86),
+      child: Pressable(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+          decoration: BoxDecoration(
+            gradient: AppTheme.primaryGradient,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.primary.withOpacity(0.4),
+                blurRadius: 22,
+                offset: const Offset(0, 12),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Icon(Icons.add_rounded, color: Colors.white, size: 22),
+              SizedBox(width: 6),
+              Text(
+                'List item',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

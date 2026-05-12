@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shimmer/shimmer.dart';
 import '../models/auction_item.dart';
 import '../theme/app_theme.dart';
 import '../widgets/countdown_timer.dart';
@@ -9,6 +10,7 @@ class AuctionCard extends StatelessWidget {
   final VoidCallback onTap;
   final bool showLiveBadge;
   final bool compact;
+  final String? heroTag;
 
   const AuctionCard({
     super.key,
@@ -16,6 +18,7 @@ class AuctionCard extends StatelessWidget {
     required this.onTap,
     this.showLiveBadge = true,
     this.compact = false,
+    this.heroTag,
   });
 
   @override
@@ -107,15 +110,19 @@ class AuctionCard extends StatelessWidget {
                               ),
                               const SizedBox(height: 2),
                               ShaderMask(
-                                shaderCallback: (b) => AppTheme.primaryGradient
-                                    .createShader(b),
-                                child: Text(
-                                  item.formattedCurrentBid,
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: compact ? 20 : 24,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: -0.5,
+                                shaderCallback: (b) =>
+                                    AppTheme.primaryGradient.createShader(b),
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    item.formattedCurrentBid,
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: compact ? 20 : 24,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: -0.5,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -142,7 +149,7 @@ class AuctionCard extends StatelessWidget {
         AspectRatio(
           aspectRatio: compact ? 4 / 3 : 16 / 11,
           child: Hero(
-            tag: 'auction_image_${item.id}',
+            tag: heroTag ?? 'auction_image_${item.id}',
             child: Image.network(
               item.imageUrl,
               fit: BoxFit.cover,
@@ -160,13 +167,11 @@ class AuctionCard extends StatelessWidget {
               },
               loadingBuilder: (context, child, progress) {
                 if (progress == null) return child;
-                return Container(
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  child: const Center(
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: AppTheme.primary,
-                    ),
+                return Shimmer.fromColors(
+                  baseColor: theme.colorScheme.surfaceContainerHighest,
+                  highlightColor: theme.colorScheme.surface,
+                  child: Container(
+                    color: theme.colorScheme.surfaceContainerHighest,
                   ),
                 );
               },
@@ -181,7 +186,37 @@ class AuctionCard extends StatelessWidget {
             children: [
               if (item.isLive && showLiveBadge) const _LivePulseBadge(),
               const Spacer(),
-              if (item.isFeatured)
+              if (item.hasEnded)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.65),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.lock_clock_rounded,
+                        size: 13,
+                        color: Colors.white70,
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        'CLOSED',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else if (item.isFeatured)
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,

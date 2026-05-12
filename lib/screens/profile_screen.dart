@@ -1,18 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../core/theme_controller.dart';
+import '../features/auth/auth_controller.dart';
+import '../features/auth/auth_repository.dart';
+import '../features/submission/my_submissions_screen.dart';
 import '../theme/app_theme.dart';
 import '../widgets/pressable.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(authStateProvider).value;
     return Scaffold(
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
-          SliverToBoxAdapter(child: _ProfileHero()),
+          SliverToBoxAdapter(
+            child: _ProfileHero(
+              name: session?.user.displayName ?? 'Guest',
+              email: session?.user.email ?? '',
+              photoUrl: session?.user.photoURL,
+              isAdmin: session?.isAdmin ?? false,
+            ),
+          ),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
@@ -21,7 +34,7 @@ class ProfileScreen extends StatelessWidget {
                   Expanded(
                     child: _StatCard(
                       label: 'Bids',
-                      value: '42',
+                      value: '0',
                       icon: Icons.gavel_rounded,
                       gradient: AppTheme.primaryGradient,
                     ),
@@ -30,7 +43,7 @@ class ProfileScreen extends StatelessWidget {
                   Expanded(
                     child: _StatCard(
                       label: 'Won',
-                      value: '12',
+                      value: '0',
                       icon: Icons.emoji_events_rounded,
                       gradient: AppTheme.amberGradient,
                     ),
@@ -39,7 +52,7 @@ class ProfileScreen extends StatelessWidget {
                   Expanded(
                     child: _StatCard(
                       label: 'Watching',
-                      value: '8',
+                      value: '0',
                       icon: Icons.favorite_rounded,
                       gradient: AppTheme.mintGradient,
                     ),
@@ -49,58 +62,55 @@ class ProfileScreen extends StatelessWidget {
             ),
           ),
           SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 28, 20, 12),
-              child: Text(
-                'Account',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  color: theme.colorScheme.onSurface.withOpacity(0.6),
-                  fontSize: 13,
-                  letterSpacing: 1,
-                ),
-              ),
-            ),
+            child: _SectionLabel(text: 'Account'),
           ),
           SliverToBoxAdapter(
             child: _MenuGroup(
-              items: const [
-                _MenuEntry(icon: Icons.history_rounded, title: 'Bid history'),
+              items: [
+                _MenuEntry(
+                  icon: Icons.history_rounded,
+                  title: 'Bid history',
+                  onTap: () {},
+                ),
                 _MenuEntry(
                   icon: Icons.favorite_border_rounded,
                   title: 'Watchlist',
+                  onTap: () {},
                 ),
                 _MenuEntry(
-                  icon: Icons.payment_rounded,
-                  title: 'Payment methods',
+                  icon: Icons.inventory_2_outlined,
+                  title: 'My submissions',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const MySubmissionsScreen(),
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
-              child: Text(
-                'Preferences',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  color: theme.colorScheme.onSurface.withOpacity(0.6),
-                  fontSize: 13,
-                  letterSpacing: 1,
-                ),
-              ),
-            ),
-          ),
+          SliverToBoxAdapter(child: _SectionLabel(text: 'Preferences')),
           SliverToBoxAdapter(
             child: _MenuGroup(
-              items: const [
-                _MenuEntry(icon: Icons.settings_rounded, title: 'Settings'),
+              items: [
+                _MenuEntry(
+                  icon: Icons.brightness_6_rounded,
+                  title: 'Appearance',
+                  trailing: const _ThemeBadge(),
+                  onTap: () => _showThemeSheet(context, ref),
+                ),
                 _MenuEntry(
                   icon: Icons.help_outline_rounded,
                   title: 'Help & support',
+                  onTap: () {},
                 ),
                 _MenuEntry(
                   icon: Icons.logout_rounded,
                   title: 'Sign out',
                   destructive: true,
+                  onTap: () =>
+                      ref.read(authControllerProvider.notifier).signOut(),
                 ),
               ],
             ),
@@ -110,9 +120,243 @@ class ProfileScreen extends StatelessWidget {
       ),
     );
   }
+
+  void _showThemeSheet(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _ThemePickerSheet(),
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  final String text;
+  const _SectionLabel({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 28, 20, 12),
+      child: Text(
+        text,
+        style: theme.textTheme.titleLarge?.copyWith(
+          color: theme.colorScheme.onSurface.withOpacity(0.6),
+          fontSize: 13,
+          letterSpacing: 1,
+        ),
+      ),
+    );
+  }
+}
+
+class _ThemeBadge extends ConsumerWidget {
+  const _ThemeBadge();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final mode = ref.watch(themeControllerProvider);
+    final label = switch (mode) {
+      ThemeMode.light => 'Light',
+      ThemeMode.dark => 'Dark',
+      ThemeMode.system => 'System',
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppTheme.primary.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        label,
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: AppTheme.primary,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+class _ThemePickerSheet extends ConsumerWidget {
+  const _ThemePickerSheet();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final current = ref.watch(themeControllerProvider);
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.onSurface.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 22),
+              Text('Appearance', style: theme.textTheme.displaySmall),
+              const SizedBox(height: 4),
+              Text(
+                'Choose how the app looks on this device.',
+                style: theme.textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 18),
+              _ThemeOption(
+                icon: Icons.phone_iphone_rounded,
+                label: 'System',
+                description: 'Follows your device setting',
+                selected: current == ThemeMode.system,
+                onTap: () => ref
+                    .read(themeControllerProvider.notifier)
+                    .set(ThemeMode.system),
+              ),
+              const SizedBox(height: 10),
+              _ThemeOption(
+                icon: Icons.light_mode_rounded,
+                label: 'Light',
+                description: 'Bright, low-contrast feed',
+                selected: current == ThemeMode.light,
+                onTap: () => ref
+                    .read(themeControllerProvider.notifier)
+                    .set(ThemeMode.light),
+              ),
+              const SizedBox(height: 10),
+              _ThemeOption(
+                icon: Icons.dark_mode_rounded,
+                label: 'Dark',
+                description: 'Easy on the eyes at night',
+                selected: current == ThemeMode.dark,
+                onTap: () => ref
+                    .read(themeControllerProvider.notifier)
+                    .set(ThemeMode.dark),
+              ),
+              const SizedBox(height: 18),
+              Center(
+                child: TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(
+                    'Done',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: AppTheme.primary,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ThemeOption extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String description;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ThemeOption({
+    required this.icon,
+    required this.label,
+    required this.description,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Pressable(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: selected ? AppTheme.primaryGradient : null,
+          color: selected ? null : theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: selected
+                    ? Colors.white.withOpacity(0.18)
+                    : AppTheme.primary.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(
+                icon,
+                color: selected ? Colors.white : AppTheme.primary,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: selected
+                          ? Colors.white
+                          : theme.colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    description,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: selected
+                          ? Colors.white.withOpacity(0.85)
+                          : theme.textTheme.bodySmall?.color,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (selected)
+              const Icon(Icons.check_circle_rounded, color: Colors.white),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _ProfileHero extends StatelessWidget {
+  final String name;
+  final String email;
+  final String? photoUrl;
+  final bool isAdmin;
+
+  const _ProfileHero({
+    required this.name,
+    required this.email,
+    required this.photoUrl,
+    required this.isAdmin,
+  });
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -146,17 +390,25 @@ class _ProfileHero extends StatelessWidget {
                         color: Colors.white.withOpacity(0.4),
                         width: 2,
                       ),
+                      image: photoUrl == null
+                          ? null
+                          : DecorationImage(
+                              image: NetworkImage(photoUrl!),
+                              fit: BoxFit.cover,
+                            ),
                     ),
-                    child: const Center(
-                      child: Text(
-                        'A',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 26,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
+                    child: photoUrl != null
+                        ? null
+                        : Center(
+                            child: Text(
+                              name.isEmpty ? '?' : name[0].toUpperCase(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 26,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -164,11 +416,11 @@ class _ProfileHero extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
-                          children: const [
+                          children: [
                             Flexible(
                               child: Text(
-                                'Alex Morgan',
-                                style: TextStyle(
+                                name,
+                                style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 20,
                                   fontWeight: FontWeight.w800,
@@ -176,38 +428,26 @@ class _ProfileHero extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            SizedBox(width: 6),
-                            Icon(
-                              Icons.verified_rounded,
-                              size: 18,
-                              color: Colors.white,
-                            ),
+                            if (isAdmin) ...[
+                              const SizedBox(width: 6),
+                              const Icon(
+                                Icons.verified_rounded,
+                                size: 18,
+                                color: Colors.white,
+                              ),
+                            ],
                           ],
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'alex@goldengavel.com',
+                          email,
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.85),
                             fontSize: 13,
                           ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
-                    ),
-                  ),
-                  Pressable(
-                    onTap: () {},
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.18),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: const Icon(
-                        Icons.edit_rounded,
-                        color: Colors.white,
-                        size: 18,
-                      ),
                     ),
                   ),
                 ],
@@ -215,9 +455,7 @@ class _ProfileHero extends StatelessWidget {
               const SizedBox(height: 20),
               Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
+                    horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(18),
@@ -230,26 +468,20 @@ class _ProfileHero extends StatelessWidget {
                         color: Colors.white,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(
-                        Icons.star_rounded,
+                      child: Icon(
+                        isAdmin
+                            ? Icons.admin_panel_settings_rounded
+                            : Icons.star_rounded,
                         size: 14,
                         color: AppTheme.primary,
                       ),
                     ),
                     const SizedBox(width: 10),
-                    const Text(
-                      'Gold Member',
-                      style: TextStyle(
+                    Text(
+                      isAdmin ? 'Admin' : 'Member',
+                      style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      '2,400 pts',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.85),
-                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
@@ -319,10 +551,14 @@ class _MenuEntry {
   final IconData icon;
   final String title;
   final bool destructive;
+  final Widget? trailing;
+  final VoidCallback onTap;
   const _MenuEntry({
     required this.icon,
     required this.title,
+    required this.onTap,
     this.destructive = false,
+    this.trailing,
   });
 }
 
@@ -370,11 +606,12 @@ class _MenuTile extends StatelessWidget {
     final color = item.destructive ? AppTheme.coral : AppTheme.primary;
 
     return Pressable(
-      onTap: () {},
+      onTap: item.onTap,
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               children: [
                 Container(
@@ -396,6 +633,10 @@ class _MenuTile extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (item.trailing != null) ...[
+                  item.trailing!,
+                  const SizedBox(width: 8),
+                ],
                 Icon(
                   Icons.chevron_right_rounded,
                   color: theme.colorScheme.onSurface.withOpacity(0.4),

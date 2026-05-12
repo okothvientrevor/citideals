@@ -1,0 +1,169 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.admin == true;
+    }
+
+    function isSelf(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function canBidAuction() {
+      let minInc = ('minBidIncrement' in resource.data && resource.data.minBidIncrement != null)
+                   ? resource.data.minBidIncrement : 0;
+      return isSignedIn()
+        && resource.data.status == 'approved'
+        && resource.data.sellerId != request.auth.uid
+        && request.time < resource.data.endTime
+        && request.resource.data.sellerId == resource.data.sellerId
+        && request.resource.data.status == resource.data.status
+        && request.resource.data.title == resource.data.title
+        && request.resource.data.description == resource.data.description
+        && request.resource.data.category == resource.data.category
+        && request.resource.data.categoryData == resource.data.categoryData
+        && request.resource.data.imageUrls == resource.data.imageUrls
+        && request.resource.data.startingBid == resource.data.startingBid
+        && request.resource.data.endTime == resource.data.endTime
+        && request.resource.data.currentBid > resource.data.currentBid
+        && (minInc == 0 || request.resource.data.currentBid >= resource.data.currentBid + minInc)
+        && request.resource.data.totalBids == resource.data.totalBids + 1;
+    }
+
+    // --- users -----------------------------------------------------------
+    match /users/{uid} {
+      // Anyone signed-in can read profile basics (name/photo) for bid attribution.
+      allow read: if isSignedIn();
+      // Only the user can write their own profile. Role/claim is server-managed.
+      allow create, update: if isSelf(uid)
+        && !('role' in request.resource.data.diff(resource.data).affectedKeys());
+      allow delete: if false;
+    }
+
+    // --- auctions --------------------------------------------------------
+    match /auctions/{auctionId} {
+      // Public reads: only approved listings.
+      // Sellers can see their own at any status.
+      // Admins can see everything.
+      allow read: if
+        (resource.data.status == 'approved') ||
+        (isSignedIn() && resource.data.sellerId == request.auth.uid) ||
+        isAdmin();
+
+      // Listing queries against status=='pending' or other-seller pending docs
+      // are governed by document-level read above; clients must scope queries
+      // accordingly (see auctions_repository.dart).
+
+      // Create: signed-in user submitting their own listing as pending.
+      // Bids, status changes, and bid counters are server-only.
+      allow create: if isSignedIn()
+        && request.resource.data.sellerId == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.currentBid == request.resource.data.startingBid
+        && request.resource.data.totalBids == 0
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 140
+        && request.resource.data.imageUrls is list
+        && request.resource.data.imageUrls.size() >= 1
+        && request.resource.data.imageUrls.size() <= 8;
+
+      // Sellers can edit only while still pending and only certain fields.
+      allow update: if isSignedIn()
+        && resource.data.sellerId == request.auth.uid
+        && resource.data.status == 'pending'
+        && request.resource.data.status == 'pending'
+        && request.resource.data.sellerId == resource.data.sellerId
+        && request.resource.data.currentBid == resource.data.currentBid
+        && request.resource.data.totalBids == resource.data.totalBids;
+
+      // Signed-in non-seller users can place bids directly via client-side
+      // transaction when Cloud Functions are unavailable.
+      allow update: if canBidAuction();
+
+      // Admin can update only approval-related fields (the rest is server-set
+      // via Cloud Function approveSubmission, which uses Admin SDK bypassing rules).
+      // We still allow direct admin writes for emergency moderation.
+      allow update: if isAdmin();
+
+      allow delete: if false; // Use status: rejected/ended instead.
+
+      // --- bids subcollection ------------------------------------------
+      match /bids/{bidId} {
+        // Anyone signed-in can read the bid history of any auction.
+        allow read: if isSignedIn();
+        // Bid writes are allowed only as part of a valid transaction that
+        // also updates the parent auction state.
+        allow create: if isSignedIn()
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.amount is number
+          && request.resource.data.amount > 0
+          && request.resource.data.userName is string
+          && request.resource.data.timestamp == request.time
+          && getAfter(/databases/$(database)/documents/auctions/$(auctionId)).data.currentBid == request.resource.data.amount
+          && getAfter(/databases/$(database)/documents/auctions/$(auctionId)).data.totalBids == get(/databases/$(database)/documents/auctions/$(auctionId)).data.totalBids + 1;
+        allow update, delete: if false;
+      }
+    }
+
+    // --- raffles ---------------------------------------------------------
+    match /raffles/{raffleId} {
+      // Users can browse active/ended raffles; admins can read all states.
+      allow read: if isSignedIn()
+        && (resource.data.status in ['active', 'ended'] || isAdmin());
+
+      // Admin-managed metadata.
+      allow create, delete: if isAdmin();
+
+      // Admin full edits.
+      allow update: if isAdmin();
+
+      // User ticket purchase path: only increments sold_tickets on active raffle.
+      allow update: if isSignedIn()
+        && resource.data.status == 'active'
+        && request.time >= resource.data.start_date
+        && request.time <= resource.data.end_date
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sold_tickets'])
+        && request.resource.data.sold_tickets is int
+        && request.resource.data.sold_tickets > resource.data.sold_tickets
+        && request.resource.data.sold_tickets <= resource.data.max_tickets;
+    }
+
+    match /raffle_tickets/{ticketId} {
+      allow read: if isSignedIn() &&
+        (resource.data.user_id == request.auth.uid || isAdmin());
+
+      // Tickets are generated as part of a purchase transaction.
+      allow create: if isSignedIn()
+        && request.resource.data.user_id == request.auth.uid
+        && request.resource.data.raffle_id is string
+        && request.resource.data.ticket_number is string
+        && request.resource.data.payment_reference is string
+        && request.resource.data.timestamp == request.time;
+
+      allow update, delete: if false;
+    }
+
+    match /raffle_payments/{paymentId} {
+      allow read: if isSignedIn() &&
+        (resource.data.user_id == request.auth.uid || isAdmin());
+
+      allow create: if isSignedIn()
+        && request.resource.data.user_id == request.auth.uid
+        && request.resource.data.raffle_id is string
+        && request.resource.data.tickets_bought is int
+        && request.resource.data.amount is number
+        && request.resource.data.payment_method is string
+        && request.resource.data.payment_reference is string
+        && request.resource.data.timestamp == request.time;
+
+      allow update, delete: if false;
+    }
+  }
+}

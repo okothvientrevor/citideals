@@ -1,3 +1,5 @@
+import 'package:intl/intl.dart';
+
 class Bid {
   final String id;
   final String auctionItemId;
@@ -18,12 +20,8 @@ class Bid {
   });
 
   String get formattedAmount {
-    if (amount >= 1000000) {
-      return '\$${(amount / 1000000).toStringAsFixed(1)}M';
-    } else if (amount >= 1000) {
-      return '\$${(amount / 1000).toStringAsFixed(0)}K';
-    }
-    return '\$${amount.toStringAsFixed(0)}';
+    final comma = NumberFormat('#,##0', 'en_US');
+    return 'UGX ${comma.format(amount)}';
   }
 
   String get timeAgo {

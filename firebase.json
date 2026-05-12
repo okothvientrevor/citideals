@@ -1,0 +1,62 @@
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "venv",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ],
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run lint",
+        "npm --prefix \"$RESOURCE_DIR\" run build"
+      ]
+    }
+  ],
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "citideals",
+          "appId": "1:179831856277:android:6d6086a23f57c8140e4f9c",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "ios": {
+        "default": {
+          "projectId": "citideals",
+          "appId": "1:179831856277:ios:e8ca29be50a3aae40e4f9c",
+          "uploadDebugSymbols": false,
+          "fileOutput": "ios/Runner/GoogleService-Info.plist"
+        }
+      },
+      "macos": {
+        "default": {
+          "projectId": "citideals",
+          "appId": "1:179831856277:ios:e8ca29be50a3aae40e4f9c",
+          "uploadDebugSymbols": false,
+          "fileOutput": "macos/Runner/GoogleService-Info.plist"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "citideals",
+          "configurations": {
+            "android": "1:179831856277:android:6d6086a23f57c8140e4f9c",
+            "ios": "1:179831856277:ios:e8ca29be50a3aae40e4f9c",
+            "macos": "1:179831856277:ios:e8ca29be50a3aae40e4f9c",
+            "web": "1:179831856277:web:a293788ab14aedb60e4f9c",
+            "windows": "1:179831856277:web:e9bc9a4cf43cf1fa0e4f9c"
+          }
+        }
+      }
+    }
+  }
+}

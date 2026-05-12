@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "179831856277",
+    "project_id": "citideals",
+    "storage_bucket": "citideals.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:179831856277:android:6d6086a23f57c8140e4f9c",
+        "android_client_info": {
+          "package_name": "com.citideals.citideals"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyANs2NYhDbIz1hufzDLsfVxfY_ildwmj8s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

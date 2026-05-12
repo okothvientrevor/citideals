@@ -1,21 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/auction_item.dart';
+import '../services/auctions_repository.dart';
 import '../widgets/auction_card.dart';
-import '../data/mock_data.dart';
 import '../theme/app_theme.dart';
 import 'auction_detail_screen.dart';
 
-class LiveAuctionsScreen extends StatefulWidget {
+class LiveAuctionsScreen extends ConsumerStatefulWidget {
   const LiveAuctionsScreen({super.key});
 
   @override
-  State<LiveAuctionsScreen> createState() => _LiveAuctionsScreenState();
+  ConsumerState<LiveAuctionsScreen> createState() => _LiveAuctionsScreenState();
 }
 
-class _LiveAuctionsScreenState extends State<LiveAuctionsScreen> {
+class _LiveAuctionsScreenState extends ConsumerState<LiveAuctionsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final liveAuctions = MockData.getLiveAuctions();
+    final liveAsync = ref.watch(liveAuctionsStreamProvider);
+    final endedAsync = ref.watch(endedAuctionsStreamProvider);
+    final liveAuctions = liveAsync.value ?? const <AuctionItem>[];
+    final endedAuctions = endedAsync.value ?? const <AuctionItem>[];
+
+    // Total unique bidders = sum of totalBids across live items
+    final totalBidders = liveAuctions.fold(0, (sum, a) => sum + a.totalBids);
 
     return Scaffold(
       body: RefreshIndicator(
@@ -90,7 +98,10 @@ class _LiveAuctionsScreenState extends State<LiveAuctionsScreen> {
                         ],
                       ),
                       const SizedBox(height: 12),
-                      _StatsRow(activeBidders: 142, items: liveAuctions.length),
+                      _StatsRow(
+                        activeBidders: totalBidders,
+                        items: liveAuctions.length,
+                      ),
                     ],
                   ),
                 ),
@@ -105,8 +116,7 @@ class _LiveAuctionsScreenState extends State<LiveAuctionsScreen> {
                 itemBuilder: (context, index) {
                   return TweenAnimationBuilder<double>(
                     tween: Tween(begin: 0, end: 1),
-                    duration:
-                        Duration(milliseconds: 350 + (index * 70)),
+                    duration: Duration(milliseconds: 350 + (index * 70)),
                     curve: Curves.easeOutCubic,
                     builder: (context, value, child) => Opacity(
                       opacity: value,
@@ -121,9 +131,8 @@ class _LiveAuctionsScreenState extends State<LiveAuctionsScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => AuctionDetailScreen(
-                              item: liveAuctions[index],
-                            ),
+                            builder: (context) =>
+                                AuctionDetailScreen(item: liveAuctions[index]),
                           ),
                         );
                       },
@@ -132,6 +141,98 @@ class _LiveAuctionsScreenState extends State<LiveAuctionsScreen> {
                 },
               ),
             ),
+            // ── Closed Bids section ────────────────────────────────
+            if (endedAuctions.isNotEmpty) ...[
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 32, 20, 12),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.lock_clock_rounded,
+                        size: 18,
+                        color: Colors.grey,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Closed Bids',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          color: theme.colorScheme.onSurface.withOpacity(0.6),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                sliver: SliverList.separated(
+                  itemCount: endedAuctions.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 14),
+                  itemBuilder: (context, index) {
+                    final item = endedAuctions[index];
+                    return Stack(
+                      children: [
+                        Opacity(
+                          opacity: 0.6,
+                          child: AuctionCard(
+                            item: item,
+                            showLiveBadge: false,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => AuctionDetailScreen(item: item),
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (item.totalBids > 0)
+                          Positioned(
+                            bottom: 16,
+                            right: 16,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                gradient: AppTheme.mintGradient,
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppTheme.mint.withOpacity(0.4),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.emoji_events_rounded,
+                                    size: 14,
+                                    color: Colors.white,
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Winner Selected',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ],
             const SliverToBoxAdapter(child: SizedBox(height: 120)),
           ],
         ),
