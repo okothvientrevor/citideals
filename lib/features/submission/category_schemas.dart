@@ -405,3 +405,362 @@ const Map<String, CategoryDef> categorySchemas = {
 };
 
 List<String> get categoryNames => categorySchemas.keys.toList();
+
+// ─── Extended categories (shown in "Other" bottom sheet) ───────────────────
+
+const Map<String, CategoryDef> moreCategories = {
+  'Electronics': CategoryDef(
+    name: 'Electronics',
+    icon: Icons.devices_rounded,
+    fields: [
+      FieldDef(
+        key: 'brand',
+        label: 'Brand',
+        type: FieldType.text,
+        required: true,
+        icon: Icons.label_rounded,
+      ),
+      FieldDef(
+        key: 'model',
+        label: 'Model / SKU',
+        type: FieldType.text,
+        icon: Icons.tag_rounded,
+      ),
+      FieldDef(
+        key: 'condition',
+        label: 'Condition',
+        type: FieldType.dropdown,
+        options: _condition,
+        required: true,
+        icon: Icons.shield_rounded,
+      ),
+      FieldDef(
+        key: 'storageCapacity',
+        label: 'Storage / Capacity',
+        type: FieldType.text,
+        helpText: 'e.g. 256 GB, 8 GB RAM',
+        icon: Icons.memory_rounded,
+      ),
+      FieldDef(
+        key: 'accessories',
+        label: 'Included accessories',
+        type: FieldType.multiline,
+        icon: Icons.cable_rounded,
+      ),
+    ],
+  ),
+  'Furniture': CategoryDef(
+    name: 'Furniture',
+    icon: Icons.chair_rounded,
+    fields: [
+      FieldDef(
+        key: 'type',
+        label: 'Furniture type',
+        type: FieldType.dropdown,
+        options: [
+          'Sofa',
+          'Table',
+          'Chair',
+          'Bed',
+          'Wardrobe',
+          'Desk',
+          'Shelf',
+          'Other',
+        ],
+        required: true,
+        icon: Icons.chair_rounded,
+      ),
+      FieldDef(
+        key: 'material',
+        label: 'Material',
+        type: FieldType.text,
+        icon: Icons.texture_rounded,
+      ),
+      FieldDef(
+        key: 'dimensions',
+        label: 'Dimensions (W×H×D cm)',
+        type: FieldType.text,
+        icon: Icons.straighten_rounded,
+      ),
+      FieldDef(
+        key: 'condition',
+        label: 'Condition',
+        type: FieldType.dropdown,
+        options: _condition,
+        required: true,
+        icon: Icons.shield_rounded,
+      ),
+    ],
+  ),
+  'Books & Collectibles': CategoryDef(
+    name: 'Books & Collectibles',
+    icon: Icons.menu_book_rounded,
+    fields: [
+      FieldDef(
+        key: 'itemType',
+        label: 'Item type',
+        type: FieldType.dropdown,
+        options: [
+          'Book',
+          'Manuscript',
+          'Comic',
+          'Stamp',
+          'Coin',
+          'Trading card',
+          'Memorabilia',
+          'Other',
+        ],
+        required: true,
+        icon: Icons.collections_bookmark_rounded,
+      ),
+      FieldDef(
+        key: 'author',
+        label: 'Author / Creator',
+        type: FieldType.text,
+        icon: Icons.person_rounded,
+      ),
+      FieldDef(
+        key: 'year',
+        label: 'Year',
+        type: FieldType.number,
+        icon: Icons.calendar_today_rounded,
+      ),
+      FieldDef(
+        key: 'edition',
+        label: 'Edition',
+        type: FieldType.text,
+        icon: Icons.copy_rounded,
+      ),
+      FieldDef(
+        key: 'condition',
+        label: 'Condition',
+        type: FieldType.dropdown,
+        options: _condition,
+        required: true,
+        icon: Icons.shield_rounded,
+      ),
+    ],
+  ),
+  'Sports & Fitness': CategoryDef(
+    name: 'Sports & Fitness',
+    icon: Icons.sports_rounded,
+    fields: [
+      FieldDef(
+        key: 'sport',
+        label: 'Sport / Activity',
+        type: FieldType.text,
+        required: true,
+        icon: Icons.sports_rounded,
+      ),
+      FieldDef(
+        key: 'brand',
+        label: 'Brand',
+        type: FieldType.text,
+        icon: Icons.label_rounded,
+      ),
+      FieldDef(
+        key: 'size',
+        label: 'Size',
+        type: FieldType.text,
+        icon: Icons.straighten_rounded,
+      ),
+      FieldDef(
+        key: 'condition',
+        label: 'Condition',
+        type: FieldType.dropdown,
+        options: _condition,
+        required: true,
+        icon: Icons.shield_rounded,
+      ),
+    ],
+  ),
+  'Musical Instruments': CategoryDef(
+    name: 'Musical Instruments',
+    icon: Icons.music_note_rounded,
+    fields: [
+      FieldDef(
+        key: 'instrumentType',
+        label: 'Instrument',
+        type: FieldType.dropdown,
+        options: [
+          'Guitar',
+          'Piano / Keyboard',
+          'Drums',
+          'Violin',
+          'Bass',
+          'Wind',
+          'Other',
+        ],
+        required: true,
+        icon: Icons.music_note_rounded,
+      ),
+      FieldDef(
+        key: 'brand',
+        label: 'Brand',
+        type: FieldType.text,
+        icon: Icons.label_rounded,
+      ),
+      FieldDef(
+        key: 'year',
+        label: 'Year made',
+        type: FieldType.number,
+        icon: Icons.calendar_today_rounded,
+      ),
+      FieldDef(
+        key: 'condition',
+        label: 'Condition',
+        type: FieldType.dropdown,
+        options: _condition,
+        required: true,
+        icon: Icons.shield_rounded,
+      ),
+      FieldDef(
+        key: 'accessories',
+        label: 'Included accessories',
+        type: FieldType.multiline,
+        icon: Icons.cable_rounded,
+      ),
+    ],
+  ),
+  'Wine & Spirits': CategoryDef(
+    name: 'Wine & Spirits',
+    icon: Icons.wine_bar_rounded,
+    fields: [
+      FieldDef(
+        key: 'producer',
+        label: 'Producer / Distillery',
+        type: FieldType.text,
+        required: true,
+        icon: Icons.factory_rounded,
+      ),
+      FieldDef(
+        key: 'vintage',
+        label: 'Vintage year',
+        type: FieldType.number,
+        icon: Icons.calendar_today_rounded,
+      ),
+      FieldDef(
+        key: 'region',
+        label: 'Region / Appellation',
+        type: FieldType.text,
+        icon: Icons.place_rounded,
+      ),
+      FieldDef(
+        key: 'volume',
+        label: 'Volume (ml)',
+        type: FieldType.number,
+        icon: Icons.local_bar_rounded,
+      ),
+      FieldDef(
+        key: 'sealed',
+        label: 'Original seal intact',
+        type: FieldType.boolean,
+        icon: Icons.verified_rounded,
+      ),
+    ],
+  ),
+  'Antiques': CategoryDef(
+    name: 'Antiques',
+    icon: Icons.history_edu_rounded,
+    fields: [
+      FieldDef(
+        key: 'era',
+        label: 'Era / Period',
+        type: FieldType.text,
+        required: true,
+        helpText: 'e.g. Victorian, Art Deco, Ming Dynasty',
+        icon: Icons.access_time_rounded,
+      ),
+      FieldDef(
+        key: 'origin',
+        label: 'Country of origin',
+        type: FieldType.text,
+        icon: Icons.public_rounded,
+      ),
+      FieldDef(
+        key: 'material',
+        label: 'Material / Medium',
+        type: FieldType.text,
+        icon: Icons.texture_rounded,
+      ),
+      FieldDef(
+        key: 'provenance',
+        label: 'Provenance',
+        type: FieldType.multiline,
+        helpText: 'Ownership history, auction records.',
+        icon: Icons.history_rounded,
+      ),
+      FieldDef(
+        key: 'authenticated',
+        label: 'Authenticated / Certified',
+        type: FieldType.boolean,
+        icon: Icons.verified_rounded,
+      ),
+    ],
+  ),
+  'Toys & Games': CategoryDef(
+    name: 'Toys & Games',
+    icon: Icons.toys_rounded,
+    fields: [
+      FieldDef(
+        key: 'brand',
+        label: 'Brand',
+        type: FieldType.text,
+        required: true,
+        icon: Icons.label_rounded,
+      ),
+      FieldDef(
+        key: 'ageRange',
+        label: 'Age range',
+        type: FieldType.text,
+        icon: Icons.child_care_rounded,
+      ),
+      FieldDef(
+        key: 'condition',
+        label: 'Condition',
+        type: FieldType.dropdown,
+        options: _condition,
+        required: true,
+        icon: Icons.shield_rounded,
+      ),
+      FieldDef(
+        key: 'originalPackaging',
+        label: 'Original packaging',
+        type: FieldType.boolean,
+        icon: Icons.inventory_2_rounded,
+      ),
+    ],
+  ),
+  'Other': CategoryDef(
+    name: 'Other',
+    icon: Icons.category_rounded,
+    fields: [
+      FieldDef(
+        key: 'itemType',
+        label: 'Item type / category',
+        type: FieldType.text,
+        required: true,
+        icon: Icons.category_rounded,
+      ),
+      FieldDef(
+        key: 'condition',
+        label: 'Condition',
+        type: FieldType.dropdown,
+        options: _condition,
+        icon: Icons.shield_rounded,
+      ),
+      FieldDef(
+        key: 'details',
+        label: 'Additional details',
+        type: FieldType.multiline,
+        icon: Icons.notes_rounded,
+      ),
+    ],
+  ),
+};
+
+/// Combined schema map used for looking up any category.
+Map<String, CategoryDef> get allCategorySchemas => {
+  ...categorySchemas,
+  ...moreCategories,
+};

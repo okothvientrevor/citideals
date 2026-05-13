@@ -45,6 +45,14 @@ final myPlacedBidsStreamProvider = StreamProvider<List<Bid>>((ref) {
   return ref.watch(auctionsRepositoryProvider).myPlacedBids(session.user.uid);
 });
 
+/// Live stream of a single auction by its document ID.
+final auctionByIdStreamProvider = StreamProvider.family<AuctionItem, String>((
+  ref,
+  id,
+) {
+  return ref.watch(auctionsRepositoryProvider).watch(id);
+});
+
 class AuctionsRepository {
   AuctionsRepository(this._db);
   final FirebaseFirestore _db;
@@ -86,7 +94,12 @@ class AuctionsRepository {
         .orderBy('createdAt', descending: true)
         .limit(12)
         .snapshots()
-        .map((s) => s.docs.map(AuctionItem.fromFirestore).toList());
+        .map(
+          (s) => s.docs
+              .map(AuctionItem.fromFirestore)
+              .where((a) => !a.hasEnded)
+              .toList(),
+        );
   }
 
   Stream<List<AuctionItem>> pendingForAdmin() {
@@ -250,6 +263,15 @@ class AuctionsRepository {
         'timestamp': FieldValue.serverTimestamp(),
         'isWinning': true,
       });
+    });
+  }
+
+  /// Immediately closes an auction (sets status → ended and endTime → now).
+  /// Only the seller should call this.
+  Future<void> closeAuction(String id) {
+    return _col.doc(id).update({
+      'status': 'ended',
+      'endTime': Timestamp.fromDate(DateTime.now()),
     });
   }
 }

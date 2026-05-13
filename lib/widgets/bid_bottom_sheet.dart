@@ -7,6 +7,12 @@ import '../widgets/countdown_timer.dart';
 import '../widgets/deposit_bottom_sheet.dart';
 import '../widgets/pressable.dart';
 
+const _kBidGradient = LinearGradient(
+  colors: [Color(0xFFEC4899), Color(0xFF8B5CF6)],
+  begin: Alignment.centerLeft,
+  end: Alignment.centerRight,
+);
+
 class BidBottomSheet extends StatefulWidget {
   final AuctionItem item;
   final bool isSignedIn;
@@ -204,81 +210,99 @@ class _BidBottomSheetState extends State<BidBottomSheet> {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      gradient: AppTheme.primaryGradient,
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.primary.withOpacity(0.35),
-                          blurRadius: 24,
-                          offset: const Offset(0, 12),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        const Padding(
-                          padding: EdgeInsets.only(bottom: 6),
-                          child: Text(
-                            'UGX',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 18,
-                            ),
+                  Builder(
+                    builder: (context) {
+                      final isDark =
+                          Theme.of(context).brightness == Brightness.dark;
+                      return Container(
+                        padding: const EdgeInsets.fromLTRB(20, 16, 14, 16),
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? const Color(0xFF0F0F1A)
+                              : const Color(0xFFF4F4F8),
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(
+                            color: isDark
+                                ? Colors.white.withOpacity(0.07)
+                                : Colors.transparent,
                           ),
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: TextField(
-                            controller: _bidController,
-                            keyboardType: TextInputType.number,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                            ],
-                            cursorColor: Colors.white,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 38,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -1,
-                            ),
-                            decoration: const InputDecoration(
-                              border: InputBorder.none,
-                              enabledBorder: InputBorder.none,
-                              focusedBorder: InputBorder.none,
-                              filled: false,
-                              isDense: true,
-                              contentPadding: EdgeInsets.zero,
-                            ),
-                            onChanged: (v) {
-                              final value = double.tryParse(v);
-                              if (value != null) {
-                                setState(() {
-                                  _currentValue = value.clamp(_minBid, _maxBid);
-                                });
-                              }
-                            },
-                          ),
-                        ),
-                        Column(
-                          children: [
-                            _StepBtn(
-                              icon: Icons.add_rounded,
-                              onTap: () => _bump(500),
-                            ),
-                            const SizedBox(height: 8),
-                            _StepBtn(
-                              icon: Icons.remove_rounded,
-                              onTap: () => _bump(-500),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.12),
+                              blurRadius: 20,
+                              offset: const Offset(0, 6),
                             ),
                           ],
                         ),
-                      ],
-                    ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Text(
+                              'UGX',
+                              style: TextStyle(
+                                color: isDark
+                                    ? Colors.white54
+                                    : Theme.of(
+                                        context,
+                                      ).colorScheme.onSurface.withOpacity(0.45),
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: _bidController,
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                ],
+                                cursorColor: AppTheme.primary,
+                                style: TextStyle(
+                                  color: isDark
+                                      ? Colors.white
+                                      : Theme.of(context).colorScheme.onSurface,
+                                  fontSize: 34,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.5,
+                                ),
+                                decoration: const InputDecoration(
+                                  border: InputBorder.none,
+                                  enabledBorder: InputBorder.none,
+                                  focusedBorder: InputBorder.none,
+                                  filled: false,
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.zero,
+                                ),
+                                onChanged: (v) {
+                                  final value = double.tryParse(v);
+                                  if (value != null) {
+                                    setState(() {
+                                      _currentValue = value.clamp(
+                                        _minBid,
+                                        _maxBid,
+                                      );
+                                    });
+                                  }
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            _BidChip(
+                              label: '+1k',
+                              onTap: () => _bump(1000),
+                              isDark: isDark,
+                            ),
+                            const SizedBox(width: 8),
+                            _BidChip(
+                              label: '+5k',
+                              onTap: () => _bump(5000),
+                              isDark: isDark,
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 14),
                   SliderTheme(
@@ -317,37 +341,18 @@ class _BidBottomSheetState extends State<BidBottomSheet> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 18),
-                  Row(
-                    children: [
-                      _QuickBidButton(
-                        label: '+1K',
-                        onPressed: () => _bump(1000),
-                      ),
-                      const SizedBox(width: 10),
-                      _QuickBidButton(
-                        label: '+5K',
-                        onPressed: () => _bump(5000),
-                      ),
-                      const SizedBox(width: 10),
-                      _QuickBidButton(
-                        label: '+10K',
-                        onPressed: () => _bump(10000),
-                      ),
-                    ],
-                  ),
                   const SizedBox(height: 24),
                   Pressable(
                     onTap: _placeBid,
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 18),
                       decoration: BoxDecoration(
-                        gradient: AppTheme.primaryGradient,
+                        gradient: _kBidGradient,
                         borderRadius: BorderRadius.circular(22),
                         boxShadow: [
                           BoxShadow(
-                            color: AppTheme.primary.withOpacity(0.35),
-                            blurRadius: 24,
+                            color: const Color(0xFF8B5CF6).withOpacity(0.45),
+                            blurRadius: 28,
                             offset: const Offset(0, 12),
                           ),
                         ],
@@ -362,7 +367,7 @@ class _BidBottomSheetState extends State<BidBottomSheet> {
                           ),
                           SizedBox(width: 10),
                           Text(
-                            'Place bid',
+                            'Place Bid',
                             style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w800,
@@ -396,53 +401,33 @@ class _BidBottomSheetState extends State<BidBottomSheet> {
   }
 }
 
-class _StepBtn extends StatelessWidget {
-  final IconData icon;
+class _BidChip extends StatelessWidget {
+  final String label;
   final VoidCallback onTap;
-  const _StepBtn({required this.icon, required this.onTap});
+  final bool isDark;
+
+  const _BidChip({
+    required this.label,
+    required this.onTap,
+    required this.isDark,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(6),
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(10),
+          color: isDark ? const Color(0xFF1A1A2E) : const Color(0xFFE5EAFF),
+          borderRadius: BorderRadius.circular(14),
         ),
-        child: Icon(icon, color: Colors.white, size: 16),
-      ),
-    );
-  }
-}
-
-class _QuickBidButton extends StatelessWidget {
-  final String label;
-  final VoidCallback onPressed;
-
-  const _QuickBidButton({required this.label, required this.onPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Expanded(
-      child: Pressable(
-        onTap: onPressed,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          decoration: BoxDecoration(
-            color: AppTheme.primary.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Center(
-            child: Text(
-              label,
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: AppTheme.primary,
-                fontSize: 14,
-              ),
-            ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isDark ? Colors.white70 : AppTheme.primary,
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
           ),
         ),
       ),

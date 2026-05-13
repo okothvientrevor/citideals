@@ -42,6 +42,14 @@
       ]
     },
     {
+      "collectionGroup": "bids",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "raffle_tickets",
       "queryScope": "COLLECTION",
       "fields": [

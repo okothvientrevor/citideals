@@ -24,6 +24,31 @@ final myRaffleTicketsStreamProvider =
       return ref.watch(rafflesRepositoryProvider).myTickets(uid);
     });
 
+/// User tickets filtered by raffle
+final myTicketsForRaffleProvider =
+    StreamProvider.family<List<RaffleTicket>, ({String uid, String raffleId})>((
+      ref,
+      args,
+    ) {
+      return ref
+          .watch(rafflesRepositoryProvider)
+          .myTicketsForRaffle(args.uid, args.raffleId);
+    });
+
+/// Recent purchase activity for a raffle
+final raffleActivityProvider =
+    StreamProvider.family<List<RaffleActivity>, String>((ref, raffleId) {
+      return ref.watch(rafflesRepositoryProvider).raffleActivity(raffleId);
+    });
+
+/// Live single-raffle document stream
+final singleRaffleStreamProvider = StreamProvider.family<Raffle?, String>((
+  ref,
+  raffleId,
+) {
+  return ref.watch(rafflesRepositoryProvider).raffleById(raffleId);
+});
+
 class RafflesRepository {
   RafflesRepository(this._db);
   final FirebaseFirestore _db;
@@ -56,6 +81,33 @@ class RafflesRepository {
         .limit(200)
         .snapshots()
         .map((s) => s.docs.map(RaffleTicket.fromDoc).toList());
+  }
+
+  Stream<List<RaffleTicket>> myTicketsForRaffle(String uid, String raffleId) {
+    return _db
+        .collection('raffle_tickets')
+        .where('user_id', isEqualTo: uid)
+        .where('raffle_id', isEqualTo: raffleId)
+        .orderBy('timestamp', descending: false)
+        .snapshots()
+        .map((s) => s.docs.map(RaffleTicket.fromDoc).toList());
+  }
+
+  Stream<Raffle?> raffleById(String raffleId) {
+    return _raffles
+        .doc(raffleId)
+        .snapshots()
+        .map((s) => s.exists ? Raffle.fromDoc(s) : null);
+  }
+
+  Stream<List<RaffleActivity>> raffleActivity(String raffleId) {
+    return _db
+        .collection('raffle_payments')
+        .where('raffle_id', isEqualTo: raffleId)
+        .orderBy('timestamp', descending: true)
+        .limit(30)
+        .snapshots()
+        .map((s) => s.docs.map(RaffleActivity.fromDoc).toList());
   }
 
   Future<void> createRaffle(Raffle raffle) {

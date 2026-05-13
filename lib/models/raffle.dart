@@ -123,3 +123,31 @@ class RaffleTicket {
     );
   }
 }
+
+class RaffleActivity {
+  final String id;
+  final String userName;
+  final int ticketsBought;
+  final DateTime timestamp;
+  final String? avatarUrl;
+
+  const RaffleActivity({
+    required this.id,
+    required this.userName,
+    required this.ticketsBought,
+    required this.timestamp,
+    this.avatarUrl,
+  });
+
+  factory RaffleActivity.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final d = doc.data() ?? const {};
+    final ts = d['timestamp'];
+    return RaffleActivity(
+      id: doc.id,
+      userName: (d['user_name'] as String?) ?? 'Someone',
+      ticketsBought: (d['tickets_bought'] as num?)?.toInt() ?? 1,
+      timestamp: ts is Timestamp ? ts.toDate() : DateTime.now(),
+      avatarUrl: d['avatar_url'] as String?,
+    );
+  }
+}

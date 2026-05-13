@@ -112,6 +112,12 @@ service cloud.firestore {
       }
     }
 
+    // Collection group rule required for collectionGroup('bids') queries.
+    // Allows signed-in users to query their own bids across all auctions.
+    match /{path=**}/bids/{bidId} {
+      allow read: if isSignedIn();
+    }
+
     // --- raffles ---------------------------------------------------------
     match /raffles/{raffleId} {
       // Users can browse active/ended raffles; admins can read all states.

@@ -2,33 +2,37 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
-  // Modern vibrant palette
-  static const Color primary = Color(0xFF7C5CFF); // electric violet
-  static const Color primaryDark = Color(0xFF5B3DF5);
-  static const Color accent = Color(0xFFFF4D8D); // hot pink
-  static const Color accentSoft = Color(0xFFFFB6CB);
-  static const Color mint = Color(0xFF22D3A4);
-  static const Color amber = Color(0xFFFFB020);
-  static const Color coral = Color(0xFFFF6B5B);
+  // Blue-first palette
+  static const Color primary = Color(0xFF1A6BFF); // vivid blue
+  static const Color primaryDark = Color(0xFF0F52E0); // deeper blue
+  static const Color primaryLight = Color(
+    0xFF4D90FF,
+  ); // softer blue for dark mode
+  static const Color accent = Color(0xFF00C6FF); // sky / cyan accent
+  static const Color accentSoft = Color(0xFFB3E5FF);
+  static const Color mint = Color(0xFF22D3A4); // success / winning (keep)
+  static const Color amber = Color(0xFFFFB020); // featured badge (keep)
+  static const Color coral = Color(0xFFFF6B5B); // live / error badge (keep)
 
-  // Light surfaces
-  static const Color lightBg = Color(0xFFF6F4FB);
+  // ── Light surfaces (clean white + blue tints) ─────────────────────────────
+  static const Color lightBg = Color(0xFFF4F7FF);
   static const Color lightCard = Color(0xFFFFFFFF);
-  static const Color lightMuted = Color(0xFFEDEAF6);
-  static const Color lightText = Color(0xFF14122B);
-  static const Color lightSubtle = Color(0xFF6B6889);
+  static const Color lightMuted = Color(0xFFEBF0FF);
+  static const Color lightText = Color(0xFF0B1437);
+  static const Color lightSubtle = Color(0xFF6478A3);
 
-  // Dark surfaces
-  static const Color darkBg = Color(0xFF0F0D1F);
-  static const Color darkCard = Color(0xFF1B1733);
-  static const Color darkMuted = Color(0xFF272246);
-  static const Color darkText = Color(0xFFF4F2FF);
-  static const Color darkSubtle = Color(0xFFA8A4C7);
+  // ── Dark surfaces (pure black + blue accents) ─────────────────────────────
+  static const Color darkBg = Color(0xFF000000);
+  static const Color darkCard = Color(0xFF0C0C0C);
+  static const Color darkMuted = Color(0xFF1A1A1A);
+  static const Color darkText = Color(0xFFF5F8FF);
+  static const Color darkSubtle = Color(0xFF8298C8);
 
+  // ── Gradients ─────────────────────────────────────────────────────────────
   static const LinearGradient primaryGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF8A6BFF), Color(0xFFFF4D8D)],
+    colors: [Color(0xFF1A6BFF), Color(0xFF00C6FF)],
   );
 
   static const LinearGradient mintGradient = LinearGradient(
@@ -48,8 +52,8 @@ class AppTheme {
     return [
       BoxShadow(
         color: isDark
-            ? Colors.black.withOpacity(0.35)
-            : const Color(0xFF7C5CFF).withOpacity(0.08),
+            ? Colors.black.withOpacity(0.4)
+            : const Color(0xFF1A6BFF).withOpacity(0.10),
         blurRadius: 24,
         offset: const Offset(0, 8),
       ),
@@ -113,6 +117,11 @@ class AppTheme {
         color: base,
         letterSpacing: 0.3,
       ),
+      titleSmall: GoogleFonts.plusJakartaSans(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        color: base,
+      ),
     );
   }
 
@@ -124,7 +133,7 @@ class AppTheme {
     },
   );
 
-  // Light Theme
+  // ── Light Theme ───────────────────────────────────────────────────────────
   static ThemeData lightTheme = ThemeData(
     useMaterial3: true,
     brightness: Brightness.light,
@@ -140,7 +149,7 @@ class AppTheme {
       surface: lightCard,
       onSurface: lightText,
       surfaceContainerHighest: lightMuted,
-      outline: Color(0xFFE3DFF1),
+      outline: Color(0xFFDDE6FF),
     ),
     appBarTheme: AppBarTheme(
       backgroundColor: lightBg,
@@ -196,10 +205,7 @@ class AppTheme {
         color: lightSubtle,
         fontWeight: FontWeight.w500,
       ),
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: 18,
-        vertical: 16,
-      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(20),
         borderSide: BorderSide.none,
@@ -216,7 +222,7 @@ class AppTheme {
     textTheme: _textTheme(lightText, lightSubtle),
   );
 
-  // Dark Theme
+  // ── Dark Theme ────────────────────────────────────────────────────────────
   static ThemeData darkTheme = ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
@@ -224,7 +230,7 @@ class AppTheme {
     splashFactory: InkSparkle.splashFactory,
     pageTransitionsTheme: _pageTransitions,
     colorScheme: const ColorScheme.dark(
-      primary: primary,
+      primary: primaryLight,
       onPrimary: Colors.white,
       secondary: accent,
       onSecondary: Colors.white,
@@ -232,10 +238,10 @@ class AppTheme {
       surface: darkCard,
       onSurface: darkText,
       surfaceContainerHighest: darkMuted,
-      outline: Color(0xFF332D55),
+      outline: Color(0xFF242424),
     ),
     appBarTheme: AppBarTheme(
-      backgroundColor: darkBg,
+      backgroundColor: Colors.black,
       elevation: 0,
       scrolledUnderElevation: 0,
       centerTitle: false,
@@ -254,7 +260,7 @@ class AppTheme {
     ),
     chipTheme: ChipThemeData(
       backgroundColor: darkMuted,
-      selectedColor: primary,
+      selectedColor: primaryLight,
       labelStyle: GoogleFonts.plusJakartaSans(
         fontWeight: FontWeight.w600,
         color: darkText,
@@ -269,7 +275,7 @@ class AppTheme {
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: primary,
+        backgroundColor: primaryLight,
         foregroundColor: Colors.white,
         elevation: 0,
         padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 18),
@@ -288,17 +294,14 @@ class AppTheme {
         color: darkSubtle,
         fontWeight: FontWeight.w500,
       ),
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: 18,
-        vertical: 16,
-      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(20),
         borderSide: BorderSide.none,
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(20),
-        borderSide: const BorderSide(color: primary, width: 1.5),
+        borderSide: const BorderSide(color: primaryLight, width: 1.5),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(20),

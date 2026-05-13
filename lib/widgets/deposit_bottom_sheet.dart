@@ -21,7 +21,10 @@ class DepositBottomSheet extends StatelessWidget {
     required this.onConfirm,
   });
 
+  /// Deposit = 10 % of the bid amount.
   static double depositFor(double bid) => (bid * 0.10).roundToDouble();
+
+  /// Non-refundable processing fee = 10 % of the deposit.
   static double nonRefundableFor(double deposit) =>
       (deposit * 0.10).roundToDouble();
 

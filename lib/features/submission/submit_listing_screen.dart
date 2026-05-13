@@ -50,7 +50,7 @@ class _SubmitListingScreenState extends ConsumerState<SubmitListingScreen> {
   final _titleCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   final _startingBidCtrl = TextEditingController();
-  final _minIncrementCtrl = TextEditingController(text: '100');
+  final _minIncrementCtrl = TextEditingController(text: '10,000');
   DateTime _endTime = DateTime.now().add(const Duration(days: 7));
 
   final List<File> _images = [];
@@ -334,6 +334,110 @@ class _SubmitListingScreenState extends ConsumerState<SubmitListingScreen> {
     };
   }
 
+  void _showMoreCategories() {
+    final theme = Theme.of(context);
+    final entries = moreCategories.entries.toList();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          decoration: BoxDecoration(
+            color: theme.scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 12),
+                Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.onSurface.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                  child: Row(
+                    children: [
+                      Text(
+                        'More categories',
+                        style: theme.textTheme.titleLarge,
+                      ),
+                    ],
+                  ),
+                ),
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    childAspectRatio: 0.95,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                  ),
+                  itemCount: entries.length,
+                  itemBuilder: (sheetCtx, i) {
+                    final cat = entries[i].value;
+                    return Pressable(
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        setState(() {
+                          _category = cat.name;
+                          _categoryData = {};
+                          _step = 1;
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surface,
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primary.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(
+                                cat.icon,
+                                color: AppTheme.primary,
+                                size: 20,
+                              ),
+                            ),
+                            Text(
+                              cat.name,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _categoryStep() {
     final theme = Theme.of(context);
     final entries = categorySchemas.entries.toList();
@@ -356,8 +460,59 @@ class _SubmitListingScreenState extends ConsumerState<SubmitListingScreen> {
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
           ),
-          itemCount: entries.length,
+          itemCount: entries.length + 1,
           itemBuilder: (context, i) {
+            // "Other" tile — last in the grid
+            if (i == entries.length) {
+              return Pressable(
+                onTap: _showMoreCategories,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(
+                      color: AppTheme.primary.withOpacity(0.25),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Icon(
+                          Icons.grid_view_rounded,
+                          color: AppTheme.primary,
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Other',
+                              style: theme.textTheme.titleLarge,
+                            ),
+                          ),
+                          const Icon(
+                            Icons.chevron_right_rounded,
+                            size: 18,
+                            color: AppTheme.primary,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
             final cat = entries[i].value;
             final selected = _category == cat.name;
             return Pressable(
@@ -419,7 +574,7 @@ class _SubmitListingScreenState extends ConsumerState<SubmitListingScreen> {
 
   Widget _detailsStep() {
     final theme = Theme.of(context);
-    final schema = categorySchemas[_category]!;
+    final schema = allCategorySchemas[_category]!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -455,26 +610,44 @@ class _SubmitListingScreenState extends ConsumerState<SubmitListingScreen> {
         Row(
           children: [
             Expanded(
-              child: TextFormField(
-                controller: _startingBidCtrl,
-                keyboardType: TextInputType.number,
-                inputFormatters: [_ThousandsFormatter()],
-                decoration: const InputDecoration(
-                  hintText: 'Starting bid',
-                  prefixText: 'UGX ',
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Starting Bid (UGX)',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: theme.colorScheme.onSurface.withOpacity(0.75),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  TextFormField(
+                    controller: _startingBidCtrl,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [_ThousandsFormatter()],
+                    decoration: const InputDecoration(prefixText: 'UGX '),
+                  ),
+                ],
               ),
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: TextFormField(
-                controller: _minIncrementCtrl,
-                keyboardType: TextInputType.number,
-                inputFormatters: [_ThousandsFormatter()],
-                decoration: const InputDecoration(
-                  hintText: 'Min increment',
-                  prefixText: 'UGX ',
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Minimum Increment (UGX)',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: theme.colorScheme.onSurface.withOpacity(0.75),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  TextFormField(
+                    controller: _minIncrementCtrl,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [_ThousandsFormatter()],
+                    decoration: const InputDecoration(prefixText: 'UGX '),
+                  ),
+                ],
               ),
             ),
           ],
@@ -568,105 +741,316 @@ class _SubmitListingScreenState extends ConsumerState<SubmitListingScreen> {
     );
   }
 
+  void _previewImage(File file) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          backgroundColor: Colors.black,
+          appBar: AppBar(
+            backgroundColor: Colors.black,
+            foregroundColor: Colors.white,
+            elevation: 0,
+          ),
+          body: Center(child: InteractiveViewer(child: Image.file(file))),
+        ),
+      ),
+    );
+  }
+
+  void _onTapImage(int index) {
+    final theme = Theme.of(context);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          decoration: BoxDecoration(
+            color: theme.scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 10),
+                Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.onSurface.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.fullscreen_rounded,
+                      color: AppTheme.primary,
+                    ),
+                  ),
+                  title: const Text('Preview full screen'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _previewImage(_images[index]);
+                  },
+                ),
+                if (index != 0)
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.accent.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.star_rounded,
+                        color: AppTheme.accent,
+                      ),
+                    ),
+                    title: const Text('Set as cover photo'),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      setState(() {
+                        final img = _images.removeAt(index);
+                        _images.insert(0, img);
+                      });
+                    },
+                  ),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.coral.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.delete_outline_rounded,
+                      color: AppTheme.coral,
+                    ),
+                  ),
+                  title: Text(
+                    'Remove photo',
+                    style: TextStyle(color: AppTheme.coral),
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    setState(() => _images.removeAt(index));
+                  },
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _photosStep() {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('Add photos', style: theme.textTheme.displaySmall),
         const SizedBox(height: 4),
-        Text(
-          'Up to 8 images. The first is your cover.',
-          style: theme.textTheme.bodyMedium,
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Up to 8 images. First photo is the cover.',
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
+            if (_images.isNotEmpty)
+              Text(
+                '${_images.length}/8',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: AppTheme.primary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+          ],
         ),
         const SizedBox(height: 20),
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            childAspectRatio: 1,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
+            crossAxisCount: 2,
+            childAspectRatio: 1.0,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
           ),
-          itemCount: _images.length + 1,
+          itemCount: _images.length < 8 ? _images.length + 1 : _images.length,
           itemBuilder: (context, i) {
             if (i == _images.length) {
+              // Add-photo tile
               return Pressable(
                 onTap: _pickImages,
                 child: Container(
                   decoration: BoxDecoration(
                     color: theme.colorScheme.surface,
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(22),
                     border: Border.all(
-                      color: AppTheme.primary.withOpacity(0.4),
+                      color: AppTheme.primary.withOpacity(0.35),
                       width: 1.5,
                     ),
                   ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.add_a_photo_rounded,
-                      color: AppTheme.primary,
-                      size: 28,
-                    ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primary.withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.add_a_photo_rounded,
+                          color: AppTheme.primary,
+                          size: 26,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Add photos',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: AppTheme.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               );
             }
-            return ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Image.file(_images[i], fit: BoxFit.cover),
-                  Positioned(
-                    top: 6,
-                    right: 6,
-                    child: Pressable(
-                      onTap: () => setState(() => _images.removeAt(i)),
+
+            final isCover = i == 0;
+            return Pressable(
+              onTap: () => _onTapImage(i),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(22),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Image.file(_images[i], fit: BoxFit.cover),
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withOpacity(0.25),
+                            Colors.transparent,
+                            Colors.transparent,
+                            Colors.black.withOpacity(0.45),
+                          ],
+                          stops: const [0.0, 0.25, 0.65, 1.0],
+                        ),
+                      ),
+                    ),
+                    if (isCover)
+                      Positioned(
+                        bottom: 10,
+                        left: 10,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 9,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            gradient: AppTheme.primaryGradient,
+                            borderRadius: BorderRadius.circular(10),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppTheme.primary.withOpacity(0.4),
+                                blurRadius: 8,
+                              ),
+                            ],
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.star_rounded,
+                                color: Colors.white,
+                                size: 11,
+                              ),
+                              SizedBox(width: 3),
+                              Text(
+                                'COVER',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.6,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    Positioned(
+                      top: 8,
+                      right: 8,
                       child: Container(
-                        padding: const EdgeInsets.all(6),
+                        padding: const EdgeInsets.all(5),
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.6),
-                          shape: BoxShape.circle,
+                          color: Colors.black.withOpacity(0.55),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Icon(
-                          Icons.close_rounded,
+                          Icons.more_horiz_rounded,
                           color: Colors.white,
                           size: 16,
                         ),
                       ),
                     ),
-                  ),
-                  if (i == 0)
-                    Positioned(
-                      bottom: 6,
-                      left: 6,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          gradient: AppTheme.primaryGradient,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Text(
-                          'COVER',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.6,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             );
           },
         ),
+        if (_images.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? Colors.white.withOpacity(0.05)
+                  : AppTheme.primary.withOpacity(0.06),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline_rounded,
+                  size: 15,
+                  color: AppTheme.primary.withOpacity(0.8),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Tap a photo to preview, set as cover, or remove it.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withOpacity(0.7),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }

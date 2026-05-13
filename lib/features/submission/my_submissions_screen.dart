@@ -16,12 +16,15 @@ class MySubmissionsScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('My submissions')),
       body: async.when(
         loading: () => const Center(
-            child: CircularProgressIndicator(color: AppTheme.primary)),
+          child: CircularProgressIndicator(color: AppTheme.primary),
+        ),
         error: (e, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Text('Could not load your submissions:\n$e',
-                textAlign: TextAlign.center),
+            child: Text(
+              'Could not load your submissions:\n$e',
+              textAlign: TextAlign.center,
+            ),
           ),
         ),
         data: (items) {
@@ -76,12 +79,12 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-class _SubmissionTile extends StatelessWidget {
+class _SubmissionTile extends ConsumerWidget {
   final AuctionItem item;
   const _SubmissionTile({required this.item});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     return Pressable(
       onTap: () {},
@@ -123,10 +126,7 @@ class _SubmissionTile extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    item.category,
-                    style: theme.textTheme.bodySmall,
-                  ),
+                  Text(item.category, style: theme.textTheme.bodySmall),
                   const SizedBox(height: 8),
                   _StatusChip(status: item.status),
                   if (item.status == AuctionStatus.rejected &&
@@ -140,6 +140,10 @@ class _SubmissionTile extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
+                  ],
+                  if (item.status == AuctionStatus.approved) ...[
+                    const SizedBox(height: 8),
+                    _CloseAuctionButton(item: item),
                   ],
                 ],
               ),
@@ -178,6 +182,109 @@ class _StatusChip extends StatelessWidget {
           fontSize: 11,
           letterSpacing: 0.4,
         ),
+      ),
+    );
+  }
+}
+
+class _CloseAuctionButton extends ConsumerStatefulWidget {
+  final AuctionItem item;
+  const _CloseAuctionButton({required this.item});
+
+  @override
+  ConsumerState<_CloseAuctionButton> createState() =>
+      _CloseAuctionButtonState();
+}
+
+class _CloseAuctionButtonState extends ConsumerState<_CloseAuctionButton> {
+  bool _loading = false;
+
+  Future<void> _confirmClose(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Close Auction'),
+        content: Text(
+          'Are you sure you want to close "${widget.item.title}"? '
+          'This will end the auction immediately.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppTheme.coral),
+            child: const Text('Close Auction'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _loading = true);
+    try {
+      await ref.read(auctionsRepositoryProvider).closeAuction(widget.item.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Auction closed successfully.'),
+          backgroundColor: AppTheme.mint,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString()),
+          backgroundColor: AppTheme.coral,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 30,
+      child: ElevatedButton.icon(
+        onPressed: _loading ? null : () => _confirmClose(context),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppTheme.coral.withOpacity(0.12),
+          foregroundColor: AppTheme.coral,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: BorderSide(color: AppTheme.coral.withOpacity(0.4)),
+          ),
+          textStyle: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.3,
+          ),
+        ),
+        icon: _loading
+            ? const SizedBox(
+                width: 10,
+                height: 10,
+                child: CircularProgressIndicator(
+                  strokeWidth: 1.5,
+                  color: AppTheme.coral,
+                ),
+              )
+            : const Icon(Icons.close_rounded, size: 13),
+        label: const Text('Close Auction'),
       ),
     );
   }

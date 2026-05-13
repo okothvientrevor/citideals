@@ -83,19 +83,21 @@ class CloudinaryService {
     );
   }
 
-  /// Sequential upload — keeps memory predictable on lower-end devices.
+  /// Parallel upload — uploads all files concurrently for maximum speed.
   /// Reports overall progress (0..1) as each file completes.
   Future<List<CloudinaryUploadResult>> uploadAll(
     List<File> files, {
     String? folder,
     void Function(double progress)? onProgress,
   }) async {
-    final results = <CloudinaryUploadResult>[];
-    for (var i = 0; i < files.length; i++) {
-      final res = await uploadFile(files[i], folder: folder);
-      results.add(res);
-      onProgress?.call((i + 1) / files.length);
-    }
-    return results;
+    int completed = 0;
+    final total = files.length;
+    return Future.wait(
+      files.map((file) async {
+        final res = await uploadFile(file, folder: folder);
+        onProgress?.call(++completed / total);
+        return res;
+      }),
+    );
   }
 }
