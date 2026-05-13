@@ -6,15 +6,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../features/submission/submit_listing_screen.dart';
+import '../main_navigator.dart';
 import '../models/auction_item.dart';
 import '../models/raffle.dart';
 import '../services/auctions_repository.dart';
 import '../services/raffles_repository.dart';
 import '../theme/app_theme.dart';
 import '../widgets/auction_card.dart';
+import '../widgets/cached_image.dart';
 import '../widgets/countdown_timer.dart';
 import '../widgets/pressable.dart';
 import 'auction_detail_screen.dart';
+import 'raffles_screen.dart' show RaffleDetailsScreen;
 
 final _numFmt = NumberFormat('#,##0', 'en_US');
 
@@ -29,8 +32,24 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
+enum _DiscoverSort {
+  endingSoon('Ending Soon'),
+  newest('Newest'),
+  priceLow('Price: Low → High'),
+  priceHigh('Price: High → Low'),
+  mostBids('Most Bids');
+
+  final String label;
+  const _DiscoverSort(this.label);
+}
+
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _selectedCategory = 0;
+  bool _searchOpen = false;
+  final TextEditingController _searchCtrl = TextEditingController();
+  String _searchQuery = '';
+  _DiscoverSort _sort = _DiscoverSort.endingSoon;
+
   final List<_Category> _categories = const [
     _Category('All', Icons.apps_rounded),
     _Category('Watches', Icons.watch_rounded),
@@ -39,6 +58,118 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     _Category('Real Estate', Icons.home_work_rounded),
     _Category('Jewelry', Icons.diamond_rounded),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _searchCtrl.addListener(() {
+      final q = _searchCtrl.text.trim().toLowerCase();
+      if (q != _searchQuery) setState(() => _searchQuery = q);
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  void _switchTab(int index) {
+    ref.read(tabIndexProvider.notifier).setTab(index);
+  }
+
+  void _openRaffle(Raffle raffle) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => RaffleDetailsScreen(raffle: raffle)),
+    );
+  }
+
+  Future<void> _openSortSheet() async {
+    final selected = await showModalBottomSheet<_DiscoverSort>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.onSurface.withOpacity(0.18),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Text('Sort by', style: theme.textTheme.titleLarge),
+                const SizedBox(height: 10),
+                for (final s in _DiscoverSort.values)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(s.label),
+                    trailing: s == _sort
+                        ? const Icon(
+                            Icons.check_rounded,
+                            color: AppTheme.primary,
+                          )
+                        : null,
+                    onTap: () => Navigator.of(ctx).pop(s),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (selected != null && mounted) setState(() => _sort = selected);
+  }
+
+  List<AuctionItem> _applyDiscoverFilters(List<AuctionItem> source) {
+    final selectedCat = _categories[_selectedCategory].label;
+    Iterable<AuctionItem> out = source.where(
+      (it) => selectedCat == 'All' || it.category == selectedCat,
+    );
+    if (_searchQuery.isNotEmpty) {
+      out = out.where((it) {
+        final hay = [
+          it.title,
+          it.category,
+          it.sellerName ?? '',
+          it.location ?? '',
+        ].join(' ').toLowerCase();
+        return hay.contains(_searchQuery);
+      });
+    }
+    final list = out.toList();
+    switch (_sort) {
+      case _DiscoverSort.endingSoon:
+        list.sort((a, b) => a.endTime.compareTo(b.endTime));
+        break;
+      case _DiscoverSort.newest:
+        list.sort((a, b) => b.endTime.compareTo(a.endTime));
+        break;
+      case _DiscoverSort.priceLow:
+        list.sort((a, b) => a.currentBid.compareTo(b.currentBid));
+        break;
+      case _DiscoverSort.priceHigh:
+        list.sort((a, b) => b.currentBid.compareTo(a.currentBid));
+        break;
+      case _DiscoverSort.mostBids:
+        list.sort((a, b) => b.totalBids.compareTo(a.totalBids));
+        break;
+    }
+    return list;
+  }
 
   void _openDetail(AuctionItem item, [String section = 'default']) {
     Navigator.push(
@@ -63,10 +194,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     final trending = trendingAsync.value ?? const <AuctionItem>[];
     final raffles = rafflesAsync.value ?? const <Raffle>[];
-    final selectedCat = _categories[_selectedCategory].label;
-    final discover = (liveAsync.value ?? const <AuctionItem>[])
-        .where((it) => selectedCat == 'All' || it.category == selectedCat)
-        .toList();
+    final discover = _applyDiscoverFilters(
+      liveAsync.value ?? const <AuctionItem>[],
+    );
 
     final heroItem = trending.isNotEmpty ? trending.first : null;
     final tickerItems = trending.length > 1
@@ -74,12 +204,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         : const <AuctionItem>[];
 
     return Scaffold(
-      floatingActionButton: _SubmitFab(
-        onTap: () => Navigator.push(
+      floatingActionButton: FloatingActionButton(
+        heroTag: 'home_list_item_fab',
+        onPressed: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const SubmitListingScreen()),
         ),
+        backgroundColor: AppTheme.primary,
+        elevation: 8,
+        shape: const CircleBorder(),
+        child: const Icon(Icons.add_rounded, color: Colors.white, size: 28),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: RefreshIndicator(
         color: AppTheme.primary,
         onRefresh: () async {
@@ -101,7 +237,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 heroItem: heroItem,
                 tickerItems: tickerItems,
                 onTapItem: (item) => _openDetail(item, 'trending'),
-                onSeeAll: () {},
+                onSeeAll: () => _switchTab(1),
               ),
             ),
             const SliverToBoxAdapter(child: SizedBox(height: 36)),
@@ -112,37 +248,51 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 child: _SectionHeader(
                   label: 'FEATURED',
                   title: 'Featured Raffles',
-                  onSeeAll: () {},
+                  onSeeAll: () => _switchTab(2),
                 ),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 16)),
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (ctx, i) => Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: _FeaturedRaffleCard(raffle: raffles[i]),
-                    ),
-                    childCount: raffles.length,
-                  ),
+              SliverToBoxAdapter(
+                child: _FeaturedRafflesCarousel(
+                  raffles: raffles,
+                  onTap: _openRaffle,
                 ),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 12)),
             ],
 
             // CTA
-            const SliverToBoxAdapter(child: _ExperienceCTA()),
+            SliverToBoxAdapter(
+              child: _ExperienceCTA(onStartBidding: () => _switchTab(1)),
+            ),
             const SliverToBoxAdapter(child: SizedBox(height: 36)),
 
             // Discover grid
             SliverToBoxAdapter(
-              child: _SectionHeader(
-                label: 'EXPLORE',
-                title: 'Discover',
-                onSeeAll: () {},
+              child: _DiscoverHeader(
+                searchOpen: _searchOpen,
+                onToggleSearch: () {
+                  setState(() {
+                    _searchOpen = !_searchOpen;
+                    if (!_searchOpen) {
+                      _searchCtrl.clear();
+                      _searchQuery = '';
+                    }
+                  });
+                },
+                onTapSort: _openSortSheet,
+                currentSort: _sort,
               ),
             ),
+            if (_searchOpen) ...[
+              const SliverToBoxAdapter(child: SizedBox(height: 12)),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: _DiscoverSearchBar(controller: _searchCtrl),
+                ),
+              ),
+            ],
             const SliverToBoxAdapter(child: SizedBox(height: 12)),
             SliverToBoxAdapter(
               child: _CategoryChips(
@@ -391,7 +541,11 @@ class _HeroAuctionCard extends StatelessWidget {
               if (item.imageUrl.isNotEmpty)
                 Hero(
                   tag: 'auction_image_trending_${item.id}',
-                  child: Image.network(item.imageUrl, fit: BoxFit.cover),
+                  child: CachedImage(
+                    url: item.imageUrl,
+                    fit: BoxFit.cover,
+                    targetWidth: 900,
+                  ),
                 ),
               DecoratedBox(
                 decoration: BoxDecoration(
@@ -658,7 +812,11 @@ class _TickerCard extends StatelessWidget {
                 width: 76,
                 height: 76,
                 child: item.imageUrl.isNotEmpty
-                    ? Image.network(item.imageUrl, fit: BoxFit.cover)
+                    ? CachedImage(
+                        url: item.imageUrl,
+                        fit: BoxFit.cover,
+                        targetWidth: 220,
+                      )
                     : Container(
                         decoration: const BoxDecoration(
                           gradient: AppTheme.primaryGradient,
@@ -722,10 +880,90 @@ class _TickerCard extends StatelessWidget {
 // Featured raffle card
 // ─────────────────────────────────────────────────────────────────────────────
 
+class _FeaturedRafflesCarousel extends StatefulWidget {
+  final List<Raffle> raffles;
+  final ValueChanged<Raffle> onTap;
+
+  const _FeaturedRafflesCarousel({required this.raffles, required this.onTap});
+
+  @override
+  State<_FeaturedRafflesCarousel> createState() =>
+      _FeaturedRafflesCarouselState();
+}
+
+class _FeaturedRafflesCarouselState extends State<_FeaturedRafflesCarousel> {
+  late final PageController _pc;
+  int _page = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pc = PageController(viewportFraction: 0.92);
+  }
+
+  @override
+  void dispose() {
+    _pc.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.raffles.length == 1) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: _FeaturedRaffleCard(
+          raffle: widget.raffles.first,
+          onTap: () => widget.onTap(widget.raffles.first),
+        ),
+      );
+    }
+    return Column(
+      children: [
+        SizedBox(
+          height: 360,
+          child: PageView.builder(
+            controller: _pc,
+            itemCount: widget.raffles.length,
+            onPageChanged: (p) => setState(() => _page = p),
+            itemBuilder: (ctx, i) => Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: _FeaturedRaffleCard(
+                raffle: widget.raffles[i],
+                onTap: () => widget.onTap(widget.raffles[i]),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(widget.raffles.length, (i) {
+            final active = i == _page;
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              margin: const EdgeInsets.symmetric(horizontal: 3),
+              width: active ? 18 : 6,
+              height: 6,
+              decoration: BoxDecoration(
+                color: active
+                    ? AppTheme.primary
+                    : AppTheme.primary.withOpacity(0.25),
+                borderRadius: BorderRadius.circular(3),
+              ),
+            );
+          }),
+        ),
+      ],
+    );
+  }
+}
+
 class _FeaturedRaffleCard extends StatelessWidget {
   final Raffle raffle;
+  final VoidCallback onTap;
 
-  const _FeaturedRaffleCard({required this.raffle});
+  const _FeaturedRaffleCard({required this.raffle, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -737,128 +975,138 @@ class _FeaturedRaffleCard extends StatelessWidget {
     final pctLabel = '${(pct * 100).round()}% SOLD';
     final ticketLabel = 'UGX ${_numFmt.format(raffle.ticketPrice)} / Ticket';
 
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: isDark
-                ? Colors.black.withOpacity(0.5)
-                : AppTheme.primary.withOpacity(0.07),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
-          ),
-        ],
-        border: isDark
-            ? Border.all(color: Colors.white.withOpacity(0.04))
-            : null,
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Stack(
-              children: [
-                AspectRatio(
-                  aspectRatio: 16 / 9,
-                  child: raffle.bannerImage.isNotEmpty
-                      ? Image.network(raffle.bannerImage, fit: BoxFit.cover)
-                      : Container(
-                          decoration: const BoxDecoration(
-                            gradient: AppTheme.primaryGradient,
-                          ),
-                        ),
-                ),
-                Positioned(
-                  top: 12,
-                  right: 12,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.55),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      pctLabel,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 11,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+    return Pressable(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: isDark
+                  ? Colors.black.withOpacity(0.5)
+                  : AppTheme.primary.withOpacity(0.07),
+              blurRadius: 24,
+              offset: const Offset(0, 10),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          ],
+          border: isDark
+              ? Border.all(color: Colors.white.withOpacity(0.04))
+              : null,
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Stack(
                 children: [
-                  Text(
-                    raffle.title,
-                    style: theme.textTheme.titleLarge,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  AspectRatio(
+                    aspectRatio: 16 / 9,
+                    child: raffle.bannerImage.isNotEmpty
+                        ? CachedImage(
+                            url: raffle.bannerImage,
+                            fit: BoxFit.cover,
+                            targetWidth: 900,
+                          )
+                        : Container(
+                            decoration: const BoxDecoration(
+                              gradient: AppTheme.primaryGradient,
+                            ),
+                          ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    ticketLabel,
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: isDark ? AppTheme.primaryLight : AppTheme.primary,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: LinearProgressIndicator(
-                      value: pct,
-                      backgroundColor: isDark
-                          ? const Color(0xFF252525)
-                          : const Color(0xFFE8EDFF),
-                      valueColor: const AlwaysStoppedAnimation<Color>(
-                        AppTheme.primary,
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
                       ),
-                      minHeight: 6,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton(
-                      onPressed: () {},
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: isDark
-                            ? AppTheme.primaryLight
-                            : AppTheme.primary,
-                        side: BorderSide(
-                          color: isDark
-                              ? AppTheme.primaryLight
-                              : AppTheme.primary,
-                          width: 1.5,
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        textStyle: const TextStyle(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.55),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        pctLabel,
+                        style: const TextStyle(
+                          color: Colors.white,
                           fontWeight: FontWeight.w700,
-                          fontSize: 15,
+                          fontSize: 11,
+                          letterSpacing: 0.3,
                         ),
                       ),
-                      child: const Text('Enter Now'),
                     ),
                   ),
                 ],
               ),
-            ),
-          ],
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      raffle.title,
+                      style: theme.textTheme.titleLarge,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      ticketLabel,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: isDark
+                            ? AppTheme.primaryLight
+                            : AppTheme.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: LinearProgressIndicator(
+                        value: pct,
+                        backgroundColor: isDark
+                            ? const Color(0xFF252525)
+                            : const Color(0xFFE8EDFF),
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          AppTheme.primary,
+                        ),
+                        minHeight: 6,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: onTap,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: isDark
+                              ? AppTheme.primaryLight
+                              : AppTheme.primary,
+                          side: BorderSide(
+                            color: isDark
+                                ? AppTheme.primaryLight
+                                : AppTheme.primary,
+                            width: 1.5,
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          textStyle: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                          ),
+                        ),
+                        child: const Text('Enter Now'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -870,7 +1118,9 @@ class _FeaturedRaffleCard extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _ExperienceCTA extends StatelessWidget {
-  const _ExperienceCTA();
+  final VoidCallback onStartBidding;
+
+  const _ExperienceCTA({required this.onStartBidding});
 
   @override
   Widget build(BuildContext context) {
@@ -897,118 +1147,69 @@ class _ExperienceCTA extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(28),
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
-              child: Column(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 32, 24, 28),
+          child: Column(
+            children: [
+              Text(
+                'Experience Velocity.',
+                style: theme.textTheme.displaySmall?.copyWith(fontSize: 26),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Join the elite circle of bidders and secure exclusive assets through our secure, high-speed auction platform. Real-time updates, guaranteed verification.',
+                style: theme.textTheme.bodyMedium,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              Row(
                 children: [
-                  Text(
-                    'Experience Velocity.',
-                    style: theme.textTheme.displaySmall?.copyWith(fontSize: 26),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Join the elite circle of bidders and secure exclusive assets through our secure, high-speed auction platform. Real-time updates, guaranteed verification.',
-                    style: theme.textTheme.bodyMedium,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {},
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.primary,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                          ),
-                          child: const Text(
-                            'Start Bidding',
-                            style: TextStyle(fontWeight: FontWeight.w700),
-                          ),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: onStartBidding,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () {},
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: isDark
-                                ? AppTheme.primaryLight
-                                : AppTheme.primary,
-                            side: BorderSide(
-                              color: isDark
-                                  ? AppTheme.primaryLight
-                                  : AppTheme.primary,
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                          ),
-                          child: const Text(
-                            'How it Works',
-                            style: TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            // Hero image strip (dark with glow)
-            Container(
-              height: 180,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: isDark
-                      ? [const Color(0xFF080810), const Color(0xFF0A0A22)]
-                      : [const Color(0xFF0B1437), const Color(0xFF1A3080)],
-                ),
-              ),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 220,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(120),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppTheme.primary.withOpacity(0.35),
-                            blurRadius: 80,
-                            spreadRadius: 20,
-                          ),
-                        ],
+                      child: const Text(
+                        'Start Bidding',
+                        style: TextStyle(fontWeight: FontWeight.w700),
                       ),
                     ),
                   ),
-                  Center(
-                    child: ShaderMask(
-                      shaderCallback: (b) =>
-                          AppTheme.primaryGradient.createShader(b),
-                      child: const Icon(
-                        Icons.directions_car_rounded,
-                        size: 72,
-                        color: Colors.white,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: onStartBidding,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: isDark
+                            ? AppTheme.primaryLight
+                            : AppTheme.primary,
+                        side: BorderSide(
+                          color: isDark
+                              ? AppTheme.primaryLight
+                              : AppTheme.primary,
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                      ),
+                      child: const Text(
+                        'How it Works',
+                        style: TextStyle(fontWeight: FontWeight.w700),
                       ),
                     ),
                   ),
                 ],
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1165,49 +1366,138 @@ class _CategoryChips extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Submit FAB
+// Discover section header — title + search + sort
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _SubmitFab extends StatelessWidget {
-  final VoidCallback onTap;
+class _DiscoverHeader extends StatelessWidget {
+  final bool searchOpen;
+  final VoidCallback onToggleSearch;
+  final VoidCallback onTapSort;
+  final _DiscoverSort currentSort;
 
-  const _SubmitFab({required this.onTap});
+  const _DiscoverHeader({
+    required this.searchOpen,
+    required this.onToggleSearch,
+    required this.onTapSort,
+    required this.currentSort,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 86),
-      child: Pressable(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-          decoration: BoxDecoration(
-            gradient: AppTheme.primaryGradient,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: AppTheme.primary.withOpacity(0.4),
-                blurRadius: 22,
-                offset: const Offset(0, 12),
-              ),
-            ],
-          ),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.add_rounded, color: Colors.white, size: 22),
-              SizedBox(width: 6),
-              Text(
-                'List item',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 14,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'EXPLORE',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: AppTheme.primary,
+                    fontSize: 11,
+                    letterSpacing: 1.6,
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 4),
+                Text('Discover', style: theme.textTheme.displaySmall),
+              ],
+            ),
           ),
+          _IconChip(
+            icon: searchOpen ? Icons.close_rounded : Icons.search_rounded,
+            onTap: onToggleSearch,
+            isDark: isDark,
+          ),
+          const SizedBox(width: 8),
+          _IconChip(
+            icon: Icons.tune_rounded,
+            onTap: onTapSort,
+            isDark: isDark,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _IconChip extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool isDark;
+
+  const _IconChip({
+    required this.icon,
+    required this.onTap,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        onTap();
+      },
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: isDark
+              ? AppTheme.darkCard
+              : Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.primary.withOpacity(0.07),
+              blurRadius: 14,
+              offset: const Offset(0, 5),
+            ),
+          ],
         ),
+        child: Icon(
+          icon,
+          size: 20,
+          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+        ),
+      ),
+    );
+  }
+}
+
+class _DiscoverSearchBar extends StatelessWidget {
+  final TextEditingController controller;
+  const _DiscoverSearchBar({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkCard : theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppTheme.primary.withOpacity(0.18),
+        ),
+      ),
+      child: TextField(
+        controller: controller,
+        textInputAction: TextInputAction.search,
+        decoration: InputDecoration(
+          hintText: 'Search by title, category or seller',
+          prefixIcon: const Icon(
+            Icons.search_rounded,
+            color: AppTheme.primary,
+          ),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 14),
+          isCollapsed: false,
+        ),
+        style: theme.textTheme.bodyMedium,
       ),
     );
   }

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:shimmer/shimmer.dart';
 import '../models/auction_item.dart';
 import '../theme/app_theme.dart';
+import '../widgets/cached_image.dart';
 import '../widgets/countdown_timer.dart';
 import '../widgets/pressable.dart';
 
@@ -97,39 +97,36 @@ class AuctionCard extends StatelessWidget {
                       ),
                     ],
                     SizedBox(height: compact ? 12 : 14),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Current bid',
-                                style: theme.textTheme.bodySmall,
+                        Text(
+                          'Current bid',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 2),
+                        ShaderMask(
+                          shaderCallback: (b) =>
+                              AppTheme.primaryGradient.createShader(b),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              item.formattedCurrentBid,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: compact ? 20 : 24,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.5,
                               ),
-                              const SizedBox(height: 2),
-                              ShaderMask(
-                                shaderCallback: (b) =>
-                                    AppTheme.primaryGradient.createShader(b),
-                                child: FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  alignment: Alignment.centerLeft,
-                                  child: Text(
-                                    item.formattedCurrentBid,
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: compact ? 20 : 24,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: -0.5,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
                         ),
-                        _TimePill(endTime: item.endTime),
+                        SizedBox(height: compact ? 8 : 10),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: _TimePill(endTime: item.endTime),
+                        ),
                       ],
                     ),
                   ],
@@ -143,38 +140,26 @@ class AuctionCard extends StatelessWidget {
   }
 
   Widget _buildImage(BuildContext context) {
-    final theme = Theme.of(context);
     return Stack(
       children: [
         AspectRatio(
           aspectRatio: compact ? 4 / 3 : 16 / 11,
           child: Hero(
             tag: heroTag ?? 'auction_image_${item.id}',
-            child: Image.network(
-              item.imageUrl,
+            child: CachedImage(
+              url: item.imageUrl,
               fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  decoration: const BoxDecoration(
-                    gradient: AppTheme.primaryGradient,
-                  ),
-                  child: const Icon(
-                    Icons.image_rounded,
-                    size: 48,
-                    color: Colors.white70,
-                  ),
-                );
-              },
-              loadingBuilder: (context, child, progress) {
-                if (progress == null) return child;
-                return Shimmer.fromColors(
-                  baseColor: theme.colorScheme.surfaceContainerHighest,
-                  highlightColor: theme.colorScheme.surface,
-                  child: Container(
-                    color: theme.colorScheme.surfaceContainerHighest,
-                  ),
-                );
-              },
+              targetWidth: compact ? 480 : 900,
+              errorPlaceholder: Container(
+                decoration: const BoxDecoration(
+                  gradient: AppTheme.primaryGradient,
+                ),
+                child: const Icon(
+                  Icons.image_rounded,
+                  size: 48,
+                  color: Colors.white70,
+                ),
+              ),
             ),
           ),
         ),

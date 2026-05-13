@@ -9,7 +9,9 @@ import '../models/auction_item.dart';
 import '../models/bid.dart';
 import '../services/auctions_repository.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_banner.dart';
 import '../widgets/auction_card.dart';
+import '../widgets/cached_image.dart';
 import '../widgets/countdown_timer.dart';
 import '../widgets/pressable.dart';
 import 'auction_detail_screen.dart';
@@ -729,11 +731,21 @@ class _AllBidsTab extends ConsumerWidget {
 // My Bids tab
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _MyBidsTab extends ConsumerWidget {
+class _MyBidsTab extends ConsumerStatefulWidget {
   const _MyBidsTab();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_MyBidsTab> createState() => _MyBidsTabState();
+}
+
+class _MyBidsTabState extends ConsumerState<_MyBidsTab>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
     final session = ref.watch(authStateProvider).value;
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
@@ -767,35 +779,55 @@ class _MyBidsTab extends ConsumerWidget {
       loading: () => const Center(
         child: CircularProgressIndicator(color: AppTheme.primary),
       ),
-      error: (e, _) => Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.error_outline_rounded,
-              size: 52,
-              color: isDark ? Colors.white24 : Colors.black12,
+      error: (e, st) {
+        // Surface the underlying error so missing indexes / permission denied
+        // are diagnosable on-device instead of a generic message.
+        debugPrint('myPlacedBidsStreamProvider error: $e');
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.error_outline_rounded,
+                  size: 52,
+                  color: isDark ? Colors.white24 : Colors.black12,
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'Unable to load bids',
+                  style: TextStyle(
+                    color: isDark ? Colors.white70 : Colors.black54,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '$e',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: isDark ? Colors.white38 : Colors.black38,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  onPressed: () =>
+                      ref.invalidate(myPlacedBidsStreamProvider),
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  label: const Text('Retry'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primary,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 14),
-            Text(
-              'Unable to load bids',
-              style: TextStyle(
-                color: isDark ? Colors.white70 : Colors.black54,
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Check your connection and try again.',
-              style: TextStyle(
-                color: isDark ? Colors.white38 : Colors.black38,
-                fontSize: 13,
-              ),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
       data: (bids) {
         if (bids.isEmpty) {
           return Center(
@@ -939,11 +971,13 @@ class _MyBidCardState extends ConsumerState<_MyBidCard> {
                         height: 200,
                         width: double.infinity,
                         child: auction.imageUrl.isNotEmpty
-                            ? Image.network(
-                                auction.imageUrl,
+                            ? CachedImage(
+                                url: auction.imageUrl,
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) =>
-                                    _ImagePlaceholder(isDark: isDark),
+                                targetWidth: 900,
+                                errorPlaceholder: _ImagePlaceholder(
+                                  isDark: isDark,
+                                ),
                               )
                             : _ImagePlaceholder(isDark: isDark),
                       ),
@@ -1359,28 +1393,14 @@ class _QuickBidSheetState extends ConsumerState<_QuickBidSheet> {
           );
       if (!mounted) return;
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Bid of UGX ${widget.numFmt.format(amount)} placed!'),
-          backgroundColor: AppTheme.primary,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
+      showAppBanner(
+        context,
+        'Bid of UGX ${widget.numFmt.format(amount)} placed!',
+        type: AppBannerType.success,
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString()),
-          backgroundColor: const Color(0xFFEF4444),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
+      showAppBanner(context, e.toString(), type: AppBannerType.error);
     } finally {
       if (mounted) setState(() => _placing = false);
     }
@@ -1430,7 +1450,11 @@ class _QuickBidSheetState extends ConsumerState<_QuickBidSheet> {
                       width: 56,
                       height: 56,
                       child: auction.imageUrl.isNotEmpty
-                          ? Image.network(auction.imageUrl, fit: BoxFit.cover)
+                          ? CachedImage(
+                              url: auction.imageUrl,
+                              fit: BoxFit.cover,
+                              targetWidth: 180,
+                            )
                           : Container(
                               color: isDark
                                   ? const Color(0xFF1A1A2C)

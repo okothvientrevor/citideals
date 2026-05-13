@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../theme/app_theme.dart';
+import '../../widgets/app_banner.dart';
 import '../../widgets/pressable.dart';
 import 'auth_controller.dart';
 
@@ -45,15 +46,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   }
 
   void _showError(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: AppTheme.coral,
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        content: Text(msg, style: const TextStyle(fontWeight: FontWeight.w600)),
-      ),
-    );
+    showAppBanner(context, msg, type: AppBannerType.error);
   }
 
   @override

@@ -10,6 +10,8 @@ import '../models/auction_item.dart';
 import '../models/bid.dart';
 import '../services/auctions_repository.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_banner.dart';
+import '../widgets/cached_image.dart';
 import '../widgets/countdown_timer.dart';
 import '../widgets/deposit_bottom_sheet.dart';
 import '../widgets/pressable.dart';
@@ -167,30 +169,7 @@ class _AuctionDetailScreenState extends ConsumerState<AuctionDetailScreen> {
           );
       if (!mounted) return;
       HapticFeedback.mediumImpact();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppTheme.mint,
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          duration: const Duration(seconds: 2),
-          content: const Row(
-            children: [
-              Icon(Icons.check_circle_rounded, color: Colors.white),
-              SizedBox(width: 10),
-              Text(
-                'Bid placed!',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
+      showAppBanner(context, 'Bid placed!', type: AppBannerType.success);
     } on FirebaseException catch (e) {
       _toast('[${e.code}] ${e.message ?? 'Bid rejected'}');
     } catch (e) {
@@ -201,21 +180,7 @@ class _AuctionDetailScreenState extends ConsumerState<AuctionDetailScreen> {
   }
 
   void _toast(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: AppTheme.coral,
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        content: Text(
-          msg,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
-          ),
-        ),
-      ),
-    );
+    showAppBanner(context, msg, type: AppBannerType.error);
   }
 
   void _showAllBids(AuctionItem item, List<Bid> bids) {
@@ -478,22 +443,24 @@ class _ImageCarousel extends StatelessWidget {
             child: images.length == 1
                 ? Hero(
                     tag: heroTag,
-                    child: Image.network(
-                      images.first,
+                    child: CachedImage(
+                      url: images.first,
                       fit: BoxFit.cover,
                       width: double.infinity,
-                      errorBuilder: (_, __, ___) => _placeholder(),
+                      targetWidth: 1100,
+                      errorPlaceholder: _placeholder(),
                     ),
                   )
                 : PageView.builder(
                     controller: pageCtrl,
                     onPageChanged: onPageChanged,
                     itemCount: images.length,
-                    itemBuilder: (ctx, i) => Image.network(
-                      images[i],
+                    itemBuilder: (ctx, i) => CachedImage(
+                      url: images[i],
                       fit: BoxFit.cover,
                       width: double.infinity,
-                      errorBuilder: (_, __, ___) => _placeholder(),
+                      targetWidth: 1100,
+                      errorPlaceholder: _placeholder(),
                     ),
                   ),
           ),

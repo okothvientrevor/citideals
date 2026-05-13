@@ -10,6 +10,7 @@ import '../../models/auction_item.dart';
 import '../../services/auctions_repository.dart';
 import '../../services/cloudinary_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/app_banner.dart';
 import '../../widgets/pressable.dart';
 import '../auth/auth_repository.dart';
 import 'category_schemas.dart';
@@ -201,22 +202,10 @@ class _SubmitListingScreenState extends ConsumerState<SubmitListingScreen> {
 
       if (mounted) {
         HapticFeedback.mediumImpact();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: AppTheme.mint,
-            behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.all(16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            content: const Text(
-              'Submitted! Admins will review shortly.',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
+        showAppBanner(
+          context,
+          'Submitted! Admins will review shortly.',
+          type: AppBannerType.success,
         );
         Navigator.pop(context);
       }
@@ -228,15 +217,7 @@ class _SubmitListingScreenState extends ConsumerState<SubmitListingScreen> {
   }
 
   void _toast(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: AppTheme.coral,
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        content: Text(msg, style: const TextStyle(fontWeight: FontWeight.w600)),
-      ),
-    );
+    showAppBanner(context, msg, type: AppBannerType.error);
   }
 
   @override

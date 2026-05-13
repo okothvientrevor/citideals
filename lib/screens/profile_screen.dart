@@ -11,6 +11,7 @@ import '../models/raffle.dart';
 import '../services/auctions_repository.dart';
 import '../services/raffles_repository.dart';
 import '../theme/app_theme.dart';
+import '../widgets/cached_image.dart';
 import '../widgets/pressable.dart';
 import 'auction_detail_screen.dart';
 
@@ -277,21 +278,25 @@ class _StatsRow extends ConsumerWidget {
     final isDark = theme.brightness == Brightness.dark;
     final cardBg = isDark ? AppTheme.darkCard : AppTheme.lightCard;
 
+    final statsAsync = ref.watch(userStatsStreamProvider(uid));
     final bidsAsync = ref.watch(myPlacedBidsStreamProvider);
     final ticketsAsync = ref.watch(myRaffleTicketsStreamProvider(uid));
 
-    final totalBids = bidsAsync.maybeWhen(
-      data: (b) => b.length,
-      orElse: () => null,
-    );
-    final totalWins = bidsAsync.maybeWhen(
-      data: (b) => b.where((bid) => bid.isWinning).length,
-      orElse: () => null,
-    );
-    final tickets = ticketsAsync.maybeWhen(
-      data: (t) => t.length,
-      orElse: () => null,
-    );
+    // Prefer lifetime counters from the user doc; fall back to current-stream
+    // lengths so users without a backfilled doc still see numbers.
+    final statsValue = statsAsync.value;
+    final totalBids = statsValue != null && statsValue.bids > 0
+        ? statsValue.bids
+        : bidsAsync.maybeWhen(data: (b) => b.length, orElse: () => null);
+    final totalWins = statsValue != null && statsValue.wins > 0
+        ? statsValue.wins
+        : bidsAsync.maybeWhen(
+            data: (b) => b.where((bid) => bid.isWinning).length,
+            orElse: () => null,
+          );
+    final tickets = statsValue != null && statsValue.tickets > 0
+        ? statsValue.tickets
+        : ticketsAsync.maybeWhen(data: (t) => t.length, orElse: () => null);
 
     return Row(
       children: [
@@ -584,11 +589,13 @@ class _ProfileBidTile extends ConsumerWidget {
                     width: 52,
                     height: 52,
                     child: auction.imageUrl.isNotEmpty
-                        ? Image.network(
-                            auction.imageUrl,
+                        ? CachedImage(
+                            url: auction.imageUrl,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                _ThumbPlaceholder(isDark: isDark),
+                            targetWidth: 160,
+                            errorPlaceholder: _ThumbPlaceholder(
+                              isDark: isDark,
+                            ),
                           )
                         : _ThumbPlaceholder(isDark: isDark),
                   ),
@@ -789,21 +796,36 @@ class _RaffleTicketTile extends ConsumerWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final raffleAsync = ref.watch(singleRaffleStreamProvider(raffleId));
+    final session = ref.watch(authStateProvider).value;
 
-    final title = raffleAsync.maybeWhen(
-      data: (r) => r?.title ?? 'Raffle',
-      orElse: () => 'Loading…',
-    );
-    final status = raffleAsync.maybeWhen(
-      data: (r) => r?.status,
+    final raffle = raffleAsync.maybeWhen(
+      data: (r) => r,
       orElse: () => null,
     );
+    final title = raffle?.title ?? 'Loading…';
+    final chance = (raffle != null && raffle.maxTickets > 0)
+        ? (ticketCount / raffle.maxTickets * 100)
+        : null;
 
-    final (statusLabel, statusColor) = switch (status) {
-      RaffleStatus.active => ('Active', AppTheme.mint),
-      RaffleStatus.ended => ('Ended', Colors.grey),
-      _ => ('Draft', AppTheme.amber),
-    };
+    String statusLabel;
+    Color statusColor;
+    if (raffle == null) {
+      statusLabel = 'Loading';
+      statusColor = AppTheme.amber;
+    } else if (raffle.winnerUserId != null &&
+        raffle.winnerUserId == session?.user.uid) {
+      statusLabel = 'Won';
+      statusColor = AppTheme.mint;
+    } else if (raffle.status == RaffleStatus.ended) {
+      statusLabel = 'Drawn';
+      statusColor = Colors.grey;
+    } else if (raffle.endAt.difference(DateTime.now()).inHours < 24) {
+      statusLabel = 'Ending Soon';
+      statusColor = AppTheme.coral;
+    } else {
+      statusLabel = 'Active';
+      statusColor = AppTheme.mint;
+    }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -853,7 +875,9 @@ class _RaffleTicketTile extends ConsumerWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  '$ticketCount ticket${ticketCount == 1 ? '' : 's'}',
+                  chance == null
+                      ? '$ticketCount ticket${ticketCount == 1 ? '' : 's'}'
+                      : '$ticketCount ticket${ticketCount == 1 ? '' : 's'} · ${chance.toStringAsFixed(chance < 1 ? 2 : 1)}% chance',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,

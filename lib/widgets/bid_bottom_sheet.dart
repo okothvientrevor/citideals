@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../models/auction_item.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_banner.dart';
 import '../widgets/countdown_timer.dart';
 import '../widgets/deposit_bottom_sheet.dart';
 import '../widgets/pressable.dart';
@@ -91,19 +92,10 @@ class _BidBottomSheetState extends State<BidBottomSheet> {
         ),
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppTheme.coral,
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.all(16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          content: const Text(
-            'Bid must exceed current bid',
-            style: TextStyle(fontWeight: FontWeight.w600),
-          ),
-        ),
+      showAppBanner(
+        context,
+        'Bid must exceed current bid',
+        type: AppBannerType.error,
       );
     }
   }

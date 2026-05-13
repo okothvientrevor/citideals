@@ -87,6 +87,15 @@ service cloud.firestore {
       // transaction when Cloud Functions are unavailable.
       allow update: if canBidAuction();
 
+      // Seller can early-close their own approved auction, optionally recording
+      // the winning bidder. Only these three fields may change.
+      allow update: if isSignedIn()
+        && resource.data.sellerId == request.auth.uid
+        && resource.data.status == 'approved'
+        && request.resource.data.status == 'ended'
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'endTime', 'winnerUserId']);
+
       // Admin can update only approval-related fields (the rest is server-set
       // via Cloud Function approveSubmission, which uses Admin SDK bypassing rules).
       // We still allow direct admin writes for emergency moderation.
@@ -157,8 +166,9 @@ service cloud.firestore {
     }
 
     match /raffle_payments/{paymentId} {
-      allow read: if isSignedIn() &&
-        (resource.data.user_id == request.auth.uid || isAdmin());
+      // Any signed-in user can read raffle payments for the Live Activity feed
+      // on a raffle's details screen. Writes remain restricted to the buyer.
+      allow read: if isSignedIn();
 
       allow create: if isSignedIn()
         && request.resource.data.user_id == request.auth.uid

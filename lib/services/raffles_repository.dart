@@ -190,6 +190,12 @@ class RafflesRepository {
           'timestamp': FieldValue.serverTimestamp(),
         });
       }
+
+      // Lifetime ticket counter for profile stats.
+      final userRef = _db.collection('users').doc(userId);
+      tx.set(userRef, {
+        'lifetimeTicketCount': FieldValue.increment(quantity),
+      }, SetOptions(merge: true));
     });
   }
 

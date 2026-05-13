@@ -97,7 +97,9 @@ class AuctionsRepository {
         .map(
           (s) => s.docs
               .map(AuctionItem.fromFirestore)
-              .where((a) => !a.hasEnded)
+              .where(
+                (a) => !a.hasEnded && a.status == AuctionStatus.approved,
+              )
               .toList(),
         );
   }
@@ -263,15 +265,47 @@ class AuctionsRepository {
         'timestamp': FieldValue.serverTimestamp(),
         'isWinning': true,
       });
+
+      // Lifetime bid counter for profile stats.
+      tx.set(_db.collection('users').doc(userId), {
+        'lifetimeBidCount': FieldValue.increment(1),
+      }, SetOptions(merge: true));
     });
   }
 
   /// Immediately closes an auction (sets status → ended and endTime → now).
-  /// Only the seller should call this.
-  Future<void> closeAuction(String id) {
-    return _col.doc(id).update({
+  /// Only the seller should call this. The last bidder is recorded as the
+  /// winner; their `lifetimeWinCount` is incremented by a Cloud Function
+  /// listener (cross-user writes aren't permitted via security rules).
+  Future<void> closeAuction(String id) async {
+    final ref = _col.doc(id);
+    final snap = await ref.get();
+    if (!snap.exists) return;
+    final data = snap.data()!;
+    final lastBidder = data['lastBidderId'] as String?;
+    await ref.update({
       'status': 'ended',
       'endTime': Timestamp.fromDate(DateTime.now()),
+      if (lastBidder != null && lastBidder.isNotEmpty)
+        'winnerUserId': lastBidder,
     });
   }
 }
+
+/// Streams the per-user lifetime counters from the `users/{uid}` document.
+/// Falls back to (0, 0, 0) if the doc doesn't exist yet.
+final userStatsStreamProvider =
+    StreamProvider.family<({int bids, int wins, int tickets}), String>((
+      ref,
+      uid,
+    ) {
+      final db = ref.watch(firestoreProvider);
+      return db.collection('users').doc(uid).snapshots().map((s) {
+        final d = s.data() ?? const <String, dynamic>{};
+        return (
+          bids: (d['lifetimeBidCount'] as num?)?.toInt() ?? 0,
+          wins: (d['lifetimeWinCount'] as num?)?.toInt() ?? 0,
+          tickets: (d['lifetimeTicketCount'] as num?)?.toInt() ?? 0,
+        );
+      });
+    });

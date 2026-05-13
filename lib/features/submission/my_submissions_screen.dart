@@ -4,39 +4,141 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/auction_item.dart';
 import '../../services/auctions_repository.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/app_banner.dart';
+import '../../widgets/cached_image.dart';
 import '../../widgets/pressable.dart';
 
-class MySubmissionsScreen extends ConsumerWidget {
+enum _SubFilter { all, pending, approved, ended, rejected }
+
+extension _SubFilterX on _SubFilter {
+  String get label => switch (this) {
+    _SubFilter.all => 'All',
+    _SubFilter.pending => 'Pending',
+    _SubFilter.approved => 'Approved',
+    _SubFilter.ended => 'Ended',
+    _SubFilter.rejected => 'Rejected',
+  };
+
+  bool matches(AuctionStatus status) => switch (this) {
+    _SubFilter.all => true,
+    _SubFilter.pending => status == AuctionStatus.pending,
+    _SubFilter.approved => status == AuctionStatus.approved,
+    _SubFilter.ended =>
+      status == AuctionStatus.ended || status == AuctionStatus.sold,
+    _SubFilter.rejected => status == AuctionStatus.rejected,
+  };
+}
+
+class MySubmissionsScreen extends ConsumerStatefulWidget {
   const MySubmissionsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MySubmissionsScreen> createState() =>
+      _MySubmissionsScreenState();
+}
+
+class _MySubmissionsScreenState extends ConsumerState<MySubmissionsScreen> {
+  _SubFilter _filter = _SubFilter.all;
+
+  @override
+  Widget build(BuildContext context) {
     final async = ref.watch(mySubmissionsStreamProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('My submissions')),
-      body: async.when(
-        loading: () => const Center(
-          child: CircularProgressIndicator(color: AppTheme.primary),
-        ),
-        error: (e, _) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text(
-              'Could not load your submissions:\n$e',
-              textAlign: TextAlign.center,
+      body: Column(
+        children: [
+          _FilterChipsRow(
+            selected: _filter,
+            onChange: (f) => setState(() => _filter = f),
+          ),
+          Expanded(
+            child: async.when(
+              loading: () => const Center(
+                child: CircularProgressIndicator(color: AppTheme.primary),
+              ),
+              error: (e, _) => Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    'Could not load your submissions:\n$e',
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+              data: (items) {
+                final filtered = items
+                    .where((it) => _filter.matches(it.status))
+                    .toList();
+                if (filtered.isEmpty) {
+                  return _filter == _SubFilter.all
+                      ? const _EmptyState()
+                      : _EmptyFilterState(label: _filter.label);
+                }
+                return ListView.separated(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
+                  itemCount: filtered.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (context, i) =>
+                      _SubmissionTile(item: filtered[i]),
+                );
+              },
             ),
           ),
-        ),
-        data: (items) {
-          if (items.isEmpty) return const _EmptyState();
-          return ListView.separated(
-            physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
-            itemCount: items.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (context, i) => _SubmissionTile(item: items[i]),
+        ],
+      ),
+    );
+  }
+}
+
+class _FilterChipsRow extends StatelessWidget {
+  final _SubFilter selected;
+  final ValueChanged<_SubFilter> onChange;
+
+  const _FilterChipsRow({required this.selected, required this.onChange});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+        itemCount: _SubFilter.values.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (ctx, i) {
+          final f = _SubFilter.values[i];
+          final isSelected = f == selected;
+          return ChoiceChip(
+            label: Text(f.label),
+            selected: isSelected,
+            onSelected: (_) => onChange(f),
+            selectedColor: AppTheme.primary,
+            labelStyle: TextStyle(
+              color: isSelected ? Colors.white : null,
+              fontWeight: FontWeight.w600,
+            ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _EmptyFilterState extends StatelessWidget {
+  final String label;
+  const _EmptyFilterState({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text(
+          'No $label submissions yet.',
+          style: theme.textTheme.bodyMedium,
+        ),
       ),
     );
   }
@@ -111,7 +213,11 @@ class _SubmissionTile extends ConsumerWidget {
                           color: Colors.white,
                         ),
                       )
-                    : Image.network(item.imageUrl, fit: BoxFit.cover),
+                    : CachedImage(
+                        url: item.imageUrl,
+                        fit: BoxFit.cover,
+                        targetWidth: 220,
+                      ),
               ),
             ),
             const SizedBox(width: 12),
@@ -226,28 +332,14 @@ class _CloseAuctionButtonState extends ConsumerState<_CloseAuctionButton> {
     try {
       await ref.read(auctionsRepositoryProvider).closeAuction(widget.item.id);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Auction closed successfully.'),
-          backgroundColor: AppTheme.mint,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
+      showAppBanner(
+        context,
+        'Auction closed successfully.',
+        type: AppBannerType.success,
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString()),
-          backgroundColor: AppTheme.coral,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
+      showAppBanner(context, e.toString(), type: AppBannerType.error);
     } finally {
       if (mounted) setState(() => _loading = false);
     }

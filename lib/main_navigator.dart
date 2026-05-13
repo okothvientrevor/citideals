@@ -9,6 +9,21 @@ import 'screens/auctions_screen.dart';
 import 'screens/profile_screen.dart';
 import 'widgets/modern_nav_bar.dart';
 
+/// Drives which tab is shown in [MainNavigator]. Any screen can write to this
+/// to switch tabs (e.g. Home's "View All" buttons).
+final tabIndexProvider = NotifierProvider<TabIndexController, int>(
+  TabIndexController.new,
+);
+
+class TabIndexController extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void setTab(int index) {
+    state = index;
+  }
+}
+
 class MainNavigator extends ConsumerStatefulWidget {
   const MainNavigator({super.key});
 
@@ -17,7 +32,6 @@ class MainNavigator extends ConsumerStatefulWidget {
 }
 
 class _MainNavigatorState extends ConsumerState<MainNavigator> {
-  int _currentIndex = 0;
 
   // 5 fixed screens — index 4 is admin-only, reachable via admin button
   static const _screens = <Widget>[
@@ -36,14 +50,15 @@ class _MainNavigatorState extends ConsumerState<MainNavigator> {
   ];
 
   void _openAdmin() {
-    setState(() => _currentIndex = 4);
+    ref.read(tabIndexProvider.notifier).setTab(4);
   }
 
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(authStateProvider).value;
     final isAdmin = session?.isAdmin ?? false;
-    final safeIndex = _currentIndex.clamp(0, _screens.length - 1);
+    final currentIndex = ref.watch(tabIndexProvider);
+    final safeIndex = currentIndex.clamp(0, _screens.length - 1);
 
     return Scaffold(
       body: AnimatedSwitcher(
@@ -67,7 +82,7 @@ class _MainNavigatorState extends ConsumerState<MainNavigator> {
       ),
       bottomNavigationBar: ModernNavBar(
         currentIndex: safeIndex,
-        onTap: (i) => setState(() => _currentIndex = i),
+        onTap: (i) => ref.read(tabIndexProvider.notifier).setTab(i),
         items: _items,
         showAdminButton: isAdmin,
         onAdminTap: _openAdmin,

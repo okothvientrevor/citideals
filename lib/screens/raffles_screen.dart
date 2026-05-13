@@ -12,6 +12,8 @@ import '../models/raffle.dart';
 import '../services/cloudinary_service.dart';
 import '../services/raffles_repository.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_banner.dart';
+import '../widgets/cached_image.dart';
 import '../widgets/pressable.dart';
 
 class RafflesScreen extends ConsumerStatefulWidget {
@@ -926,18 +928,6 @@ class _ActiveRaffleCardState extends ConsumerState<_ActiveRaffleCard> {
   Widget build(BuildContext context) {
     final raffle = widget.raffle;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final myTicketsCount = widget.uid == null
-        ? 0
-        : (ref
-                  .watch(
-                    myTicketsForRaffleProvider((
-                      uid: widget.uid!,
-                      raffleId: raffle.id,
-                    )),
-                  )
-                  .value
-                  ?.length ??
-              0);
 
     final pct = raffle.maxTickets == 0
         ? 0.0
@@ -974,13 +964,13 @@ class _ActiveRaffleCardState extends ConsumerState<_ActiveRaffleCard> {
                     top: Radius.circular(20),
                   ),
                   child: raffle.bannerImage.isNotEmpty
-                      ? Image.network(
-                          raffle.bannerImage,
+                      ? CachedImage(
+                          url: raffle.bannerImage,
                           height: 200,
                           width: double.infinity,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) =>
-                              _PlaceholderBanner(isDark: isDark),
+                          targetWidth: 900,
+                          errorPlaceholder: _PlaceholderBanner(isDark: isDark),
                         )
                       : _PlaceholderBanner(isDark: isDark),
                 ),
@@ -1101,80 +1091,6 @@ class _ActiveRaffleCardState extends ConsumerState<_ActiveRaffleCard> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 12),
-
-                  // Your entries + Quick Buy
-                  Row(
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Your Entries',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: isDark
-                                  ? Colors.white54
-                                  : const Color(0xFF6478A3),
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            myTicketsCount == 0
-                                ? 'None yet'
-                                : '$myTicketsCount ticket${myTicketsCount > 1 ? 's' : ''}',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: AppTheme.primary,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const Spacer(),
-                      GestureDetector(
-                        onTap: widget.onTap,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isDark
-                                ? const Color(0xFF1A2B5C)
-                                : const Color(0xFF1A3A8F),
-                            borderRadius: BorderRadius.circular(22),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppTheme.primary.withOpacity(0.25),
-                                blurRadius: 8,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.add_circle_outline_rounded,
-                                size: 15,
-                                color: Colors.white,
-                              ),
-                              SizedBox(width: 6),
-                              Text(
-                                'Quick Buy',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
                 ],
               ),
             ),
@@ -1212,13 +1128,13 @@ class _PastRaffleRow extends StatelessWidget {
             ClipRRect(
               borderRadius: BorderRadius.circular(10),
               child: raffle.bannerImage.isNotEmpty
-                  ? Image.network(
-                      raffle.bannerImage,
+                  ? CachedImage(
+                      url: raffle.bannerImage,
                       width: 60,
                       height: 60,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
-                          _SmallPlaceholder(isDark: isDark),
+                      targetWidth: 180,
+                      errorPlaceholder: _SmallPlaceholder(isDark: isDark),
                     )
                   : _SmallPlaceholder(isDark: isDark),
             ),
@@ -1454,12 +1370,13 @@ class _RaffleDetailsScreenState extends ConsumerState<RaffleDetailsScreen> {
                       borderRadius: BorderRadius.circular(20),
                       child: Stack(
                         children: [
-                          Image.network(
-                            raffle.bannerImage,
+                          CachedImage(
+                            url: raffle.bannerImage,
                             width: double.infinity,
                             height: 220,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
+                            targetWidth: 1000,
+                            errorPlaceholder: Container(
                               height: 220,
                               color: isDark
                                   ? const Color(0xFF16161F)
@@ -1642,6 +1559,17 @@ class _RaffleDetailsScreenState extends ConsumerState<RaffleDetailsScreen> {
                     ),
                   ],
                 ),
+                if (myTickets.isNotEmpty && raffle.maxTickets > 0) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'Your chance of winning: ${(myTickets.length / raffle.maxTickets * 100).toStringAsFixed(myTickets.length / raffle.maxTickets * 100 < 1 ? 2 : 1)}%',
+                    style: TextStyle(
+                      color: isDark ? Colors.white70 : Colors.black54,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 14),
                 _TicketsRow(
                   tickets: myTickets,
@@ -1873,15 +1801,17 @@ class _RaffleDetailsScreenState extends ConsumerState<RaffleDetailsScreen> {
                                 );
                             if (!context.mounted) return;
                             Navigator.pop(ctx);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Tickets purchased!'),
-                              ),
+                            showAppBanner(
+                              context,
+                              'Tickets purchased!',
+                              type: AppBannerType.success,
                             );
                           } catch (e) {
                             if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(e.toString())),
+                            showAppBanner(
+                              context,
+                              e.toString(),
+                              type: AppBannerType.error,
                             );
                           }
                         },

@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../models/auction_item.dart';
 import '../../services/auctions_repository.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/cached_image.dart';
 import '../../widgets/pressable.dart';
 import '../submission/category_schemas.dart';
 import 'submission_review_screen.dart';
@@ -257,7 +258,11 @@ class _QueueCard extends StatelessWidget {
                               color: Colors.white,
                             ),
                           )
-                        : Image.network(item.imageUrl, fit: BoxFit.cover),
+                        : CachedImage(
+                            url: item.imageUrl,
+                            fit: BoxFit.cover,
+                            targetWidth: 220,
+                          ),
                   ),
                 ),
                 const SizedBox(width: 12),
