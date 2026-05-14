@@ -476,13 +476,22 @@ class _ActiveBidsList extends ConsumerWidget {
       error: (_, __) => const _ActiveBidsEmpty(),
       data: (bids) {
         if (bids.isEmpty) return const _ActiveBidsEmpty();
+        // Deduplicate: keep only the highest-amount bid per auction.
+        final Map<String, dynamic> best = {};
+        for (final bid in bids) {
+          final key = bid.auctionItemId;
+          if (!best.containsKey(key) || bid.amount > best[key].amount) {
+            best[key] = bid;
+          }
+        }
+        final deduped = best.values.toList();
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Column(
             children: [
-              for (int i = 0; i < bids.length; i++) ...[
-                _ProfileBidTile(bid: bids[i]),
-                if (i < bids.length - 1) const SizedBox(height: 10),
+              for (int i = 0; i < deduped.length; i++) ...[
+                _ProfileBidTile(bid: deduped[i]),
+                if (i < deduped.length - 1) const SizedBox(height: 10),
               ],
             ],
           ),
@@ -593,9 +602,7 @@ class _ProfileBidTile extends ConsumerWidget {
                             url: auction.imageUrl,
                             fit: BoxFit.cover,
                             targetWidth: 160,
-                            errorPlaceholder: _ThumbPlaceholder(
-                              isDark: isDark,
-                            ),
+                            errorPlaceholder: _ThumbPlaceholder(isDark: isDark),
                           )
                         : _ThumbPlaceholder(isDark: isDark),
                   ),
@@ -798,10 +805,7 @@ class _RaffleTicketTile extends ConsumerWidget {
     final raffleAsync = ref.watch(singleRaffleStreamProvider(raffleId));
     final session = ref.watch(authStateProvider).value;
 
-    final raffle = raffleAsync.maybeWhen(
-      data: (r) => r,
-      orElse: () => null,
-    );
+    final raffle = raffleAsync.maybeWhen(data: (r) => r, orElse: () => null);
     final title = raffle?.title ?? 'Loading…';
     final chance = (raffle != null && raffle.maxTickets > 0)
         ? (ticketCount / raffle.maxTickets * 100)

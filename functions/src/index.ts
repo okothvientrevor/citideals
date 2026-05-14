@@ -191,3 +191,62 @@ export const onUserCreate = functions.identity.beforeUserCreated(async (event) =
     { merge: true },
   );
 });
+
+// ---------------------------------------------------------------------------
+// drawRaffleWinner — admin-only. Picks a random ticket for a raffle, marks
+// the raffle as ended, and records the winner on the raffle document.
+// ---------------------------------------------------------------------------
+export const drawRaffleWinner = onCall(
+  { region: 'us-central1' },
+  async (req) => {
+    const uid = req.auth?.uid;
+    const isAdmin = req.auth?.token?.admin === true;
+    if (!uid || !isAdmin) {
+      throw new HttpsError('permission-denied', 'Admin only.');
+    }
+
+    const raffleId = req.data?.raffleId as string | undefined;
+    if (!raffleId) throw new HttpsError('invalid-argument', 'raffleId missing.');
+
+    const raffleRef = db.collection('raffles').doc(raffleId);
+    const raffleSnap = await raffleRef.get();
+    if (!raffleSnap.exists) throw new HttpsError('not-found', 'Raffle not found.');
+
+    const raffle = raffleSnap.data()!;
+    if (raffle.status === 'ended' && raffle.winning_ticket_number) {
+      throw new HttpsError('failed-precondition', 'Winner already drawn.');
+    }
+
+    // Fetch all tickets for this raffle.
+    const ticketsSnap = await db
+      .collection('raffle_tickets')
+      .where('raffle_id', '==', raffleId)
+      .get();
+
+    if (ticketsSnap.empty) {
+      throw new HttpsError('failed-precondition', 'No tickets sold — cannot draw a winner.');
+    }
+
+    // Pick a uniformly random ticket.
+    const tickets = ticketsSnap.docs;
+    const winnerDoc = tickets[Math.floor(Math.random() * tickets.length)];
+    const winnerData = winnerDoc.data();
+    const winningTicketNumber = winnerData.ticket_number as string;
+    const winnerUserId = winnerData.user_id as string;
+
+    await raffleRef.update({
+      status: 'ended',
+      winning_ticket_number: winningTicketNumber,
+      winner_user_id: winnerUserId,
+      winner_selection_date: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Increment the winner's lifetime win counter.
+    await db.collection('users').doc(winnerUserId).set(
+      { lifetimeWinCount: admin.firestore.FieldValue.increment(1) },
+      { merge: true },
+    );
+
+    return { ok: true, winningTicketNumber, winnerUserId };
+  },
+);

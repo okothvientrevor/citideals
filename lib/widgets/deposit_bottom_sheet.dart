@@ -116,6 +116,21 @@ class DepositBottomSheet extends StatelessWidget {
                 child: Column(
                   children: [
                     _DepositRow(
+                      label: 'Bid amount',
+                      value: _fmt(bidAmount),
+                      valueStyle: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.primary,
+                      ),
+                    ),
+                    Divider(
+                      height: 1,
+                      thickness: 1,
+                      indent: 16,
+                      endIndent: 16,
+                      color: theme.colorScheme.outline.withOpacity(0.4),
+                    ),
+                    _DepositRow(
                       label: isTopUp ? 'Top-up deposit' : 'Deposit amount',
                       value: _fmt(payNow),
                       valueStyle: theme.textTheme.titleMedium?.copyWith(

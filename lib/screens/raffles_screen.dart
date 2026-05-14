@@ -1850,7 +1850,7 @@ class _TicketsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 102,
+      height: 110,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
@@ -1951,13 +1951,16 @@ class _TicketCard extends StatelessWidget {
               letterSpacing: 0.3,
             ),
           ),
-          Text(
-            parts.length >= 2 ? parts.last : ticketNumber,
-            style: TextStyle(
-              color: isDark ? Colors.white : theme.colorScheme.onSurface,
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-              height: 1.0,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              parts.length >= 2 ? parts.last : ticketNumber,
+              style: TextStyle(
+                color: isDark ? Colors.white : theme.colorScheme.onSurface,
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+                height: 1.0,
+              ),
             ),
           ),
           Icon(
@@ -2035,14 +2038,17 @@ class _LiveActivitySection extends StatelessWidget {
               ),
             )
           else
-            ...activity
-                .take(10)
-                .map(
-                  (a) => _ActivityRow(
-                    activity: a,
-                    relTime: _relativeTime(a.timestamp),
-                  ),
+            SizedBox(
+              height: 260,
+              child: ListView.builder(
+                physics: const BouncingScrollPhysics(),
+                itemCount: activity.length.clamp(0, 5),
+                itemBuilder: (_, i) => _ActivityRow(
+                  activity: activity[i],
+                  relTime: _relativeTime(activity[i].timestamp),
                 ),
+              ),
+            ),
         ],
       ),
     );

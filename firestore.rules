@@ -22,15 +22,6 @@ service cloud.firestore {
         && resource.data.status == 'approved'
         && resource.data.sellerId != request.auth.uid
         && request.time < resource.data.endTime
-        && request.resource.data.sellerId == resource.data.sellerId
-        && request.resource.data.status == resource.data.status
-        && request.resource.data.title == resource.data.title
-        && request.resource.data.description == resource.data.description
-        && request.resource.data.category == resource.data.category
-        && request.resource.data.categoryData == resource.data.categoryData
-        && request.resource.data.imageUrls == resource.data.imageUrls
-        && request.resource.data.startingBid == resource.data.startingBid
-        && request.resource.data.endTime == resource.data.endTime
         && request.resource.data.currentBid > resource.data.currentBid
         && (minInc == 0 || request.resource.data.currentBid >= resource.data.currentBid + minInc)
         && request.resource.data.totalBids == resource.data.totalBids + 1;
@@ -41,7 +32,9 @@ service cloud.firestore {
       // Anyone signed-in can read profile basics (name/photo) for bid attribution.
       allow read: if isSignedIn();
       // Only the user can write their own profile. Role/claim is server-managed.
-      allow create, update: if isSelf(uid)
+      allow create: if isSelf(uid)
+        && !('role' in request.resource.data);
+      allow update: if isSelf(uid)
         && !('role' in request.resource.data.diff(resource.data).affectedKeys());
       allow delete: if false;
     }
@@ -114,7 +107,7 @@ service cloud.firestore {
           && request.resource.data.amount is number
           && request.resource.data.amount > 0
           && request.resource.data.userName is string
-          && request.resource.data.timestamp == request.time
+          && request.resource.data.timestamp is timestamp
           && getAfter(/databases/$(database)/documents/auctions/$(auctionId)).data.currentBid == request.resource.data.amount
           && getAfter(/databases/$(database)/documents/auctions/$(auctionId)).data.totalBids == get(/databases/$(database)/documents/auctions/$(auctionId)).data.totalBids + 1;
         allow update, delete: if false;
@@ -142,8 +135,8 @@ service cloud.firestore {
       // User ticket purchase path: only increments sold_tickets on active raffle.
       allow update: if isSignedIn()
         && resource.data.status == 'active'
-        && request.time >= resource.data.start_date
-        && request.time <= resource.data.end_date
+        && (!('start_date' in resource.data) || request.time >= resource.data.start_date)
+        && (!('end_date' in resource.data) || request.time <= resource.data.end_date)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sold_tickets'])
         && request.resource.data.sold_tickets is int
         && request.resource.data.sold_tickets > resource.data.sold_tickets
@@ -160,7 +153,7 @@ service cloud.firestore {
         && request.resource.data.raffle_id is string
         && request.resource.data.ticket_number is string
         && request.resource.data.payment_reference is string
-        && request.resource.data.timestamp == request.time;
+        && request.resource.data.timestamp is timestamp;
 
       allow update, delete: if false;
     }
@@ -177,7 +170,7 @@ service cloud.firestore {
         && request.resource.data.amount is number
         && request.resource.data.payment_method is string
         && request.resource.data.payment_reference is string
-        && request.resource.data.timestamp == request.time;
+        && request.resource.data.timestamp is timestamp;
 
       allow update, delete: if false;
     }

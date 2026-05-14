@@ -324,7 +324,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 sliver: SliverGrid(
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
-                    childAspectRatio: 0.62,
+                    childAspectRatio: 0.58,
                     crossAxisSpacing: 14,
                     mainAxisSpacing: 14,
                   ),
@@ -1414,11 +1414,7 @@ class _DiscoverHeader extends StatelessWidget {
             isDark: isDark,
           ),
           const SizedBox(width: 8),
-          _IconChip(
-            icon: Icons.tune_rounded,
-            onTap: onTapSort,
-            isDark: isDark,
-          ),
+          _IconChip(icon: Icons.tune_rounded, onTap: onTapSort, isDark: isDark),
         ],
       ),
     );
@@ -1480,19 +1476,14 @@ class _DiscoverSearchBar extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? AppTheme.darkCard : theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppTheme.primary.withOpacity(0.18),
-        ),
+        border: Border.all(color: AppTheme.primary.withOpacity(0.18)),
       ),
       child: TextField(
         controller: controller,
         textInputAction: TextInputAction.search,
         decoration: InputDecoration(
           hintText: 'Search by title, category or seller',
-          prefixIcon: const Icon(
-            Icons.search_rounded,
-            color: AppTheme.primary,
-          ),
+          prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.primary),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(vertical: 14),
           isCollapsed: false,
